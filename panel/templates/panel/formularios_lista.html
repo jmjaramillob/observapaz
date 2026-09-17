@@ -1,0 +1,35 @@
+{% extends "panel/base.html" %}
+{% block titulo %}Formularios - OBSERVAPAZ{% endblock %}
+
+{% block contenido %}
+<h4 class="mb-1">Formularios de captura</h4>
+<p class="text-muted">Comparte cualquiera de estos enlaces. No requieren usuario para diligenciarse.</p>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <a href="{% url 'panel:formulario_general' %}" class="btn btn-primary">
+      Formulario general (todos los observatorios)
+    </a>
+  </div>
+</div>
+
+<div class="row">
+  {% for obs in observatorios %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">{{ obs.codigo }}</h6>
+        <p class="card-text small text-muted">{{ obs.nombre }}</p>
+        <a href="{% url 'panel:formulario_publico' obs.codigo %}" class="btn btn-sm btn-outline-primary">
+          Abrir formulario
+        </a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col">
+    <p class="text-muted">Aún no hay observatorios registrados. Créalos desde el panel de administración.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

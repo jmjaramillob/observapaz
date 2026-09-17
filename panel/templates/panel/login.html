@@ -1,0 +1,35 @@
+{% extends "panel/base.html" %}
+{% block titulo %}Ingresar - OBSERVAPAZ{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card shadow-sm">
+      <div class="card-header bg-dark text-white">Acceso al tablero</div>
+      <div class="card-body">
+        {% if form.errors %}
+          <div class="alert alert-danger">Usuario o contraseña incorrectos.</div>
+        {% endif %}
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_username" class="form-label">Usuario</label>
+            <input type="text" name="username" id="id_username" class="form-control" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label for="id_password" class="form-label">Contraseña</label>
+            <input type="password" name="password" id="id_password" class="form-control" required>
+          </div>
+          <input type="hidden" name="next" value="{{ next }}">
+          <button type="submit" class="btn btn-dark w-100">Ingresar</button>
+        </form>
+        <hr>
+        <p class="small text-muted mb-0">
+          ¿Solo vas a registrar información?
+          <a href="{% url 'panel:formularios' %}">Ir a los formularios públicos</a> (no requieren cuenta).
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
