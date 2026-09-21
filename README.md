@@ -30,9 +30,9 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
-- Panel de indicadores: http://localhost:8000/
-- Admin de Django: http://localhost:8000/admin/
-- API REST: http://localhost:8000/api/
+- Panel de indicadores: http://localhost:8010/
+- Admin de Django: http://localhost:8010/admin/
+- API REST: http://localhost:8010/api/
 - Metabase: http://localhost:3000/ (conéctalo a la misma base `observapaz`)
 
 ## Cargar datos de ejemplo
