@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # OBSERVAPAZ
 
 Proyecto base (sin multi-tenant) para la Red de Observatorios para la Paz
@@ -53,6 +52,3 @@ ODK real que definas).
 - Es más simple de desplegar y mantener; a cambio, todos los observatorios
   comparten las mismas tablas (con sus datos diferenciados por el campo
   `observatorio`).
-=======
-# observapaz
->>>>>>> 130b46e0a85287793e5c30953c5369beb354c4c2
