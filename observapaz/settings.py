@@ -109,5 +109,6 @@ REST_FRAMEWORK = {
     ],
 }
 
+LOGIN_URL = "panel:login"
 LOGIN_REDIRECT_URL = "panel:dashboard"
 LOGOUT_REDIRECT_URL = "panel:dashboard"
