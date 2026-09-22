@@ -9,7 +9,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
 
   web:
     build: .
@@ -22,13 +22,15 @@ services:
     depends_on:
       - db
     ports:
-      - "8000:8000"
+      # Puerto expuesto en el servidor (ajustable con WEB_PORT en .env).
+      # El 8000 de la derecha es interno del contenedor y no necesita cambiar.
+      - "127.0.0.1:${WEB_PORT:-8010}:8000"
 
   metabase:
     image: metabase/metabase:latest
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - db
 
