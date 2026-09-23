@@ -105,10 +105,34 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+        # Por defecto, cerrado: cada ViewSet abre explícitamente lo que
+        # necesita (lectura pública, creación pública, etc.) en vez de
+        # heredar un acceso amplio por accidente.
+        "rest_framework.permissions.IsAuthenticated",
     ],
 }
 
 LOGIN_URL = "panel:login"
-LOGIN_REDIRECT_URL = "panel:dashboard"
-LOGOUT_REDIRECT_URL = "panel:dashboard"
+LOGIN_REDIRECT_URL = "panel:tablero"
+LOGOUT_REDIRECT_URL = "panel:publico"
+
+# --- Correo (alertas al gestor cuando llega un registro pendiente) ---
+# Por defecto usa el backend de "consola": en vez de enviar el correo de
+# verdad, lo imprime en los logs del contenedor. Así nada se rompe si
+# todavía no has configurado un servidor SMTP real. Para enviar correos
+# de verdad, define estas variables en tu .env (ver .env.example).
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL", "OBSERVAPAZ <no-responder@observapaz.org>"
+)
+
+# URL base del sitio, para armar el enlace que va dentro del correo de
+# alerta (ej. "https://observapaz.org" en producción).
+SITIO_URL_BASE = os.environ.get("SITIO_URL_BASE", "http://localhost:8010")

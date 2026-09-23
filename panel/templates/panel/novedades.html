@@ -1,0 +1,104 @@
+{% extends "panel/base.html" %}
+{% block titulo %}Novedades pendientes - OBSERVAPAZ{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0">Bandeja de novedades pendientes</h4>
+    <small class="text-muted">Registros que llegaron por el formulario público y aún no cuentan en los tableros.</small>
+  </div>
+  <a href="{% url 'panel:tablero' %}" class="btn btn-sm btn-outline-secondary">&larr; Volver al tablero</a>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Observatorio</th><th>Indicador</th><th>Fecha</th><th>Valor</th><th>Fuente</th><th>Observaciones</th><th style="width:220px"></th></tr>
+      </thead>
+      <tbody id="filasPendientes">
+        <tr><td colspan="7" class="text-center text-muted py-4">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function obtenerCookie(nombre) {
+  const match = document.cookie.match('(^|;)\\s*' + nombre + '\\s*=\\s*([^;]+)');
+  return match ? match.pop() : '';
+}
+
+async function obtenerTodasPaginas(url) {
+  let resultados = [];
+  while (url) {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (Array.isArray(data)) { resultados = resultados.concat(data); url = null; }
+    else { resultados = resultados.concat(data.results || []); url = data.next; }
+  }
+  return resultados;
+}
+
+async function cargarPendientes() {
+  const pendientes = await obtenerTodasPaginas('/api/registros/pendientes/');
+  const filas = document.getElementById('filasPendientes');
+
+  if (pendientes.length === 0) {
+    filas.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5">No hay novedades pendientes por revisar. 🎉</td></tr>';
+    return;
+  }
+
+  filas.innerHTML = pendientes.map(r => `
+    <tr id="fila-pendiente-${r.id}">
+      <td><span class="badge bg-secondary">${r.observatorio_codigo}</span></td>
+      <td>${r.indicador_nombre}</td>
+      <td>${r.fecha}</td>
+      <td>${r.valor}</td>
+      <td>${r.fuente || '—'}</td>
+      <td>${r.observaciones || '—'}</td>
+      <td>
+        <button class="btn btn-sm btn-success" onclick="decidirRegistro(${r.id}, 'aprobar')">Aprobar</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="decidirRegistro(${r.id}, 'rechazar')">Rechazar</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function decidirRegistro(id, accion) {
+  let motivo = '';
+  if (accion === 'rechazar') {
+    motivo = prompt('¿Por qué se rechaza este registro? (opcional)') || '';
+  }
+  const headers = { 'Content-Type': 'application/json' };
+  const csrftoken = obtenerCookie('csrftoken');
+  if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
+
+  const resp = await fetch(`/api/registros/${id}/${accion}/`, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ motivo: motivo }),
+  });
+
+  if (resp.ok) {
+    const fila = document.getElementById(`fila-pendiente-${id}`);
+    if (fila) { fila.remove(); }
+    const badge = document.getElementById('badgeNovedades');
+    if (badge) {
+      const nuevoTotal = Math.max(0, parseInt(badge.textContent, 10) - 1);
+      badge.textContent = nuevoTotal;
+      if (nuevoTotal === 0) { badge.style.display = 'none'; }
+    }
+    if (document.querySelectorAll('#filasPendientes tr[id^="fila-pendiente-"]').length === 0) {
+      cargarPendientes();
+    }
+  } else {
+    alert('No se pudo procesar la decisión. Intenta de nuevo.');
+  }
+}
+
+cargarPendientes();
+</script>
+{% endblock %}

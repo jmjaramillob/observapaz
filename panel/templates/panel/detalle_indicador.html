@@ -2,7 +2,7 @@
 {% block titulo %}{{ indicador.nombre }} - OBSERVAPAZ{% endblock %}
 
 {% block contenido %}
-<a href="{% url 'panel:dashboard' %}" class="btn btn-link ps-0">&larr; Volver al tablero</a>
+<a href="{% url 'panel:tablero' %}" class="btn btn-link ps-0">&larr; Volver al tablero</a>
 
 <div class="card mb-4">
   <div class="card-header">
@@ -20,17 +20,8 @@
   <div class="table-responsive">
     <table class="table table-striped mb-0">
       <thead class="table-light"><tr><th>Fecha</th><th>Valor</th><th>Fuente</th><th>Observaciones</th></tr></thead>
-      <tbody>
-        {% for r in registros %}
-        <tr>
-          <td>{{ r.fecha }}</td>
-          <td>{{ r.valor }} {{ indicador.unidad }}</td>
-          <td>{{ r.fuente|default:"—" }}</td>
-          <td>{{ r.observaciones|default:"—" }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="4" class="text-center text-muted py-4">Sin registros todavía.</td></tr>
-        {% endfor %}
+      <tbody id="filasHistorial">
+        <tr><td colspan="4" class="text-center text-muted py-4">Cargando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -39,29 +30,68 @@
 
 {% block scripts %}
 <script>
-const datasets = [{
-  label: 'Valor registrado',
-  data: {{ valores|safe }},
-  borderColor: '#0d6efd',
-  backgroundColor: 'rgba(13,110,253,.1)',
-  fill: true,
-  tension: 0.3
-}];
-{% if meta %}
-datasets.push({
-  label: 'Meta',
-  data: Array({{ valores|safe }}.length).fill({{ meta }}),
-  borderColor: '#dc3545',
-  borderDash: [6, 4],
-  pointRadius: 0,
-  fill: false
-});
-{% endif %}
+// El acceso a esta página ya lo validó Django (404 si el indicador no
+// es tuyo); aquí solo se trae el historial. La API vuelve a validar el
+// mismo acceso de forma independiente, así que si algo raro pasara con
+// la página, la API igual protege los datos.
+async function obtenerTodasPaginas(url) {
+  let resultados = [];
+  while (url) {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (Array.isArray(data)) { resultados = resultados.concat(data); url = null; }
+    else { resultados = resultados.concat(data.results || []); url = data.next; }
+  }
+  return resultados;
+}
 
-new Chart(document.getElementById('graficoIndicador'), {
-  type: 'line',
-  data: { labels: {{ fechas|safe }}, datasets: datasets },
-  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-});
+async function cargarHistorial() {
+  const registros = await obtenerTodasPaginas('/api/registros/?indicador={{ indicador.id }}');
+  registros.sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+  const fechas = registros.map(r => r.fecha);
+  const valores = registros.map(r => r.valor);
+  const meta = {{ indicador.meta|default:"null" }};
+
+  const datasets = [{
+    label: 'Valor registrado',
+    data: valores,
+    borderColor: '#0d6efd',
+    backgroundColor: 'rgba(13,110,253,.1)',
+    fill: true,
+    tension: 0.3,
+  }];
+  if (meta !== null) {
+    datasets.push({
+      label: 'Meta',
+      data: fechas.map(() => meta),
+      borderColor: '#dc3545',
+      borderDash: [6, 4],
+      pointRadius: 0,
+      fill: false,
+    });
+  }
+
+  new Chart(document.getElementById('graficoIndicador'), {
+    type: 'line',
+    data: { labels: fechas, datasets: datasets },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+  });
+
+  const filas = document.getElementById('filasHistorial');
+  if (registros.length === 0) {
+    filas.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Sin registros todavía.</td></tr>';
+    return;
+  }
+  filas.innerHTML = registros.map(r => `
+    <tr>
+      <td>${r.fecha}</td>
+      <td>${r.valor} {{ indicador.unidad }}</td>
+      <td>${r.fuente || '—'}</td>
+      <td>${r.observaciones || '—'}</td>
+    </tr>
+  `).join('');
+}
+cargarHistorial();
 </script>
 {% endblock %}

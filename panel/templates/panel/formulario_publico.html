@@ -17,17 +17,32 @@
         <p class="text-muted small">
           Diligencia este formulario desde cualquier dispositivo. No necesitas usuario ni contraseña.
         </p>
-        <form method="post" novalidate>
-          {% csrf_token %}
-          {% for campo in form.visible_fields %}
+
+        <div id="alertaEnvio"></div>
+
+        <form id="formRegistro" novalidate>
           <div class="mb-3">
-            <label for="{{ campo.id_for_label }}" class="form-label">{{ campo.label }}</label>
-            {{ campo }}
-            {% if campo.help_text %}<div class="form-text">{{ campo.help_text }}</div>{% endif %}
-            {% for error in campo.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            <label for="id_indicador" class="form-label">Indicador</label>
+            <select id="id_indicador" class="form-select" required>
+              <option value="">Cargando indicadores…</option>
+            </select>
           </div>
-          {% endfor %}
-          {% for campo in form.hidden_fields %}{{ campo }}{% endfor %}
+          <div class="mb-3">
+            <label for="id_fecha" class="form-label">Fecha del dato</label>
+            <input type="date" id="id_fecha" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="id_valor" class="form-label">Valor registrado</label>
+            <input type="number" step="any" id="id_valor" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="id_fuente" class="form-label">Fuente de la información</label>
+            <input type="text" id="id_fuente" class="form-control" placeholder="Ej: Acta comunitaria, visita de campo">
+          </div>
+          <div class="mb-3">
+            <label for="id_observaciones" class="form-label">Observaciones</label>
+            <textarea id="id_observaciones" class="form-control" rows="3"></textarea>
+          </div>
 
           <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" id="usarUbicacion">
@@ -37,7 +52,7 @@
             <div id="estadoUbicacion" class="form-text"></div>
           </div>
 
-          <button type="submit" class="btn btn-primary w-100 py-2">Enviar registro</button>
+          <button type="submit" class="btn btn-primary w-100 py-2" id="btnEnviar">Enviar registro</button>
         </form>
       </div>
     </div>
@@ -47,12 +62,53 @@
 
 {% block scripts %}
 <script>
+let latitud = null, longitud = null;
+
+// La API pagina los listados de a 50. Este ayudante junta todas las
+// páginas, para que un observatorio con muchos indicadores no se quede
+// con la lista incompleta en el desplegable.
+async function obtenerTodasPaginas(url) {
+  let resultados = [];
+  while (url) {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (Array.isArray(data)) { resultados = resultados.concat(data); url = null; }
+    else { resultados = resultados.concat(data.results || []); url = data.next; }
+  }
+  return resultados;
+}
+
+// --- Cargar el listado de indicadores desde la API ---
+async function cargarIndicadores() {
+  const select = document.getElementById('id_indicador');
+  try {
+    let url = '/api/indicadores/?activo=true';
+    {% if observatorio %}
+    // Primero resolvemos el id del observatorio a partir de su código.
+    const observatorios = await obtenerTodasPaginas('/api/observatorios/?activo=true');
+    const obs = observatorios.find(o => o.codigo === "{{ observatorio.codigo }}");
+    if (obs) { url += `&observatorio=${obs.id}`; }
+    {% endif %}
+    const indicadores = await obtenerTodasPaginas(url);
+
+    select.innerHTML = '<option value="">Selecciona un indicador…</option>';
+    indicadores.forEach(ind => {
+      const opt = document.createElement('option');
+      opt.value = ind.id;
+      opt.textContent = ind.observatorio_codigo ? `${ind.observatorio_codigo} — ${ind.nombre}` : ind.nombre;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    select.innerHTML = '<option value="">No se pudo cargar la lista. Recarga la página.</option>';
+  }
+}
+cargarIndicadores();
+
+// --- Ubicación opcional ---
 document.getElementById('usarUbicacion').addEventListener('change', function () {
   const estado = document.getElementById('estadoUbicacion');
   if (!this.checked) {
-    document.getElementById('id_latitud').value = '';
-    document.getElementById('id_longitud').value = '';
-    estado.textContent = '';
+    latitud = null; longitud = null; estado.textContent = '';
     return;
   }
   if (!navigator.geolocation) {
@@ -61,15 +117,68 @@ document.getElementById('usarUbicacion').addEventListener('change', function () 
   }
   estado.textContent = 'Obteniendo ubicación…';
   navigator.geolocation.getCurrentPosition(
-    function (pos) {
-      document.getElementById('id_latitud').value = pos.coords.latitude;
-      document.getElementById('id_longitud').value = pos.coords.longitude;
+    pos => {
+      latitud = pos.coords.latitude;
+      longitud = pos.coords.longitude;
       estado.textContent = 'Ubicación capturada correctamente.';
     },
-    function () {
-      estado.textContent = 'No se pudo obtener la ubicación.';
-    }
+    () => { estado.textContent = 'No se pudo obtener la ubicación.'; }
   );
+});
+
+// --- Envío del formulario directo a la API ---
+function obtenerCookie(nombre) {
+  const match = document.cookie.match('(^|;)\\s*' + nombre + '\\s*=\\s*([^;]+)');
+  return match ? match.pop() : '';
+}
+
+document.getElementById('formRegistro').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const boton = document.getElementById('btnEnviar');
+  const alerta = document.getElementById('alertaEnvio');
+  boton.disabled = true;
+  boton.textContent = 'Enviando…';
+
+  const payload = {
+    indicador: document.getElementById('id_indicador').value,
+    fecha: document.getElementById('id_fecha').value,
+    valor: document.getElementById('id_valor').value,
+    fuente: document.getElementById('id_fuente').value,
+    observaciones: document.getElementById('id_observaciones').value,
+    latitud: latitud,
+    longitud: longitud,
+  };
+
+  // Para un visitante anónimo esto no hace falta (la API no exige CSRF
+  // sin sesión iniciada), pero si alguien del equipo interno usa este
+  // mismo formulario público con su sesión activa, sí se requiere.
+  const headers = { 'Content-Type': 'application/json' };
+  const csrftoken = obtenerCookie('csrftoken');
+  if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
+
+  try {
+    const resp = await fetch('/api/registros/', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (resp.ok) {
+      alerta.innerHTML = '<div class="alert alert-success">¡Gracias! El registro se guardó correctamente.</div>';
+      document.getElementById('formRegistro').reset();
+      latitud = null; longitud = null;
+      document.getElementById('estadoUbicacion').textContent = '';
+    } else {
+      const errores = await resp.json();
+      const detalle = Object.entries(errores).map(([campo, msgs]) => `${campo}: ${msgs.join(' ')}`).join('<br>');
+      alerta.innerHTML = `<div class="alert alert-danger">No se pudo guardar el registro:<br>${detalle}</div>`;
+    }
+  } catch (e) {
+    alerta.innerHTML = '<div class="alert alert-danger">Error de conexión. Intenta de nuevo.</div>';
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Enviar registro';
+  }
 });
 </script>
 {% endblock %}

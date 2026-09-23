@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.gis.db import models as gis_models
 from django.db import models
 
@@ -63,6 +64,11 @@ class Indicador(models.Model):
 class RegistroIndicador(models.Model):
     """Un valor puntual de un indicador en una fecha determinada."""
 
+    class EstadoRegistro(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente de revisión"
+        APROBADO = "aprobado", "Aprobado"
+        RECHAZADO = "rechazado", "Rechazado"
+
     indicador = models.ForeignKey(
         Indicador, on_delete=models.CASCADE, related_name="registros"
     )
@@ -73,6 +79,18 @@ class RegistroIndicador(models.Model):
     ubicacion = gis_models.PointField(
         null=True, blank=True, srid=4326, help_text="Coordenada geográfica del registro"
     )
+    estado = models.CharField(
+        max_length=12, choices=EstadoRegistro.choices, default=EstadoRegistro.PENDIENTE
+    )
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="registros_revisados",
+    )
+    revisado_en = models.DateTimeField(null=True, blank=True)
+    motivo_rechazo = models.CharField(max_length=300, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -106,3 +124,35 @@ class EnvioODK(models.Model):
 
     def __str__(self):
         return f"{self.formulario_id} ({self.envio_id})"
+
+
+class PerfilUsuario(models.Model):
+    """
+    Liga una cuenta de usuario con el observatorio al que pertenece.
+
+    - Si 'observatorio' tiene un valor: el usuario solo puede ver el
+      tablero privado de ESE observatorio (uso pensado para las 24
+      cuentas de los observatorios).
+    - Si 'observatorio' está vacío: el usuario ve el tablero completo
+      de toda la Red (uso pensado para el equipo de coordinación).
+    """
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="perfil"
+    )
+    observatorio = models.ForeignKey(
+        Observatorio,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usuarios",
+        help_text="Vacío = usuario de coordinación, ve toda la Red.",
+    )
+
+    class Meta:
+        verbose_name = "Perfil de usuario"
+        verbose_name_plural = "Perfiles de usuario"
+
+    def __str__(self):
+        destino = self.observatorio.codigo if self.observatorio else "Red / Coordinación"
+        return f"{self.usuario.username} ({destino})"
