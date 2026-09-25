@@ -7,18 +7,6 @@ from django.dispatch import receiver
 from .models import PerfilUsuario, RegistroIndicador
 
 
-@receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def crear_perfil_usuario(sender, instance, created, **kwargs):
-    """
-    Cada vez que se crea un usuario nuevo (incluido un superusuario),
-    le crea automáticamente un PerfilUsuario vacío (sin observatorio
-    asignado = ve toda la Red). Así siempre hay un perfil para editar
-    desde el admin, sin pasos manuales adicionales.
-    """
-    if created:
-        PerfilUsuario.objects.get_or_create(usuario=instance)
-
-
 @receiver(user_logged_in)
 def marcar_login_reciente(sender, request, user, **kwargs):
     """

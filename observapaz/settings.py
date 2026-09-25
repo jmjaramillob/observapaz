@@ -14,6 +14,14 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+# Dominio raíz del proyecto (sin protocolo ni subdominio), usado para
+# reconocer los subdominios de cada observatorio -ej. si esto es
+# "observapaz.org", entonces "obs-007.observapaz.org" se reconoce como
+# el subdominio del observatorio con código "OBS-007"-.
+# En desarrollo local, "localhost" (ver el truco del archivo hosts en
+# el manual para probar subdominios en tu propia PC).
+DOMINIO_BASE = os.environ.get("DOMINIO_BASE", "localhost")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -37,6 +45,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.ObservatorioSubdominioMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -88,6 +97,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "panel" / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
 STORAGES = {
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
@@ -136,3 +146,21 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 # URL base del sitio, para armar el enlace que va dentro del correo de
 # alerta (ej. "https://observapaz.org" en producción).
 SITIO_URL_BASE = os.environ.get("SITIO_URL_BASE", "http://localhost:8010")
+
+# --- Conexión con ODK Central (servidor aparte, ver el manual de
+# instalación) para traer los envíos hechos offline desde ODK Collect. ---
+ODK_CENTRAL_URL = os.environ.get("ODK_CENTRAL_URL", "")
+ODK_CENTRAL_EMAIL = os.environ.get("ODK_CENTRAL_EMAIL", "")
+ODK_CENTRAL_PASSWORD = os.environ.get("ODK_CENTRAL_PASSWORD", "")
+ODK_CENTRAL_PROJECT_ID = os.environ.get("ODK_CENTRAL_PROJECT_ID", "")
+
+# Si se define, la sesión (y el token CSRF) quedan válidos en todos los
+# subdominios a la vez -ej. ".observapaz.org"-, para que alguien pueda
+# iniciar sesión en su propio subdominio de observatorio y seguir
+# logueado si navega al dominio raíz, o viceversa. Vacío = cada
+# subdominio maneja su propia sesión por separado (más simple, pero
+# tocaría iniciar sesión de nuevo en cada uno).
+_cookie_domain = os.environ.get("COOKIE_DOMINIO_COMPARTIDO", "")
+if _cookie_domain:
+    SESSION_COOKIE_DOMAIN = _cookie_domain
+    CSRF_COOKIE_DOMAIN = _cookie_domain

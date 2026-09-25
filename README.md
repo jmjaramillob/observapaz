@@ -64,6 +64,40 @@ Para producción, los envíos de ODK Central se reciben en el endpoint
 (no incluida en este esqueleto, se agrega según el formulario ODK real
 que definas).
 
+## Subdominio por observatorio (opcional)
+
+El proyecto puede reconocer el observatorio a partir del subdominio
+(ej. `obs-007.observapaz.org` muestra directo el formulario y el
+tablero público de OBS-007), gracias a `core/middleware.py`. Se activa
+con dos variables en el `.env`:
+
+```ini
+DOMINIO_BASE=observapaz.org
+DJANGO_ALLOWED_HOSTS=observapaz.org,.observapaz.org
+```
+
+El subdominio **solo decide qué se muestra por defecto en la parte
+pública** (formulario, tablero público). Nunca se usa para decidir qué
+datos privados puede ver alguien -eso sigue dependiendo únicamente del
+`PerfilUsuario` de la cuenta logueada-, porque el encabezado `Host` lo
+puede mandar cualquiera. Ver el manual de instalación para el DNS
+comodín, el certificado HTTPS wildcard, y cómo probarlo en tu propia
+PC sin tener el dominio real todavía.
+
+## Captura offline con ODK Central / ODK Collect
+
+Para el trabajo de campo sin señal, el proyecto se conecta con **ODK
+Central** (servidor aparte, ver el manual de instalación, sección 11):
+
+- `python manage.py generar_xlsform OBS-XXX` — genera el formulario
+  (XLSForm) de un observatorio con sus indicadores activos, listo para
+  subir a Central.
+- `python manage.py sincronizar_odk` — trae los envíos nuevos desde
+  Central y los convierte en `RegistroIndicador` **pendiente de
+  revisión** — entra a la misma bandeja de "Novedades" que usa el
+  formulario web, sin importar si el dato vino del navegador o de
+  ODK Collect sin conexión. Se programa por `cron` (ver manual).
+
 ## Moderación: registros pendientes de aprobación
 
 Los registros que llegan por el **formulario público** (sin login) nacen

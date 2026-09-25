@@ -107,6 +107,7 @@
 {% block scripts %}
 <script>
 const obsFijo = {% if obs_usuario %}{{ obs_usuario.id }}{% else %}null{% endif %};
+const obsSubdominio = {% if obs_subdominio %}{{ obs_subdominio.id }}{% else %}null{% endif %};
 const mostrarAvisoLogin = {% if mostrar_aviso_pendientes %}true{% else %}false{% endif %};
 const paleta = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14','#6610f2'];
 let graficos = {};
@@ -206,7 +207,8 @@ async function cargarPendientes() {
     select.appendChild(opt);
   });
   select.addEventListener('change', () => cargarTablero(select.value || null));
-  cargarTablero(null);
+  if (obsSubdominio) { select.value = obsSubdominio; }
+  cargarTablero(obsSubdominio);
   {% else %}
   cargarTablero(obsFijo);
   {% endif %}
