@@ -1,0 +1,215 @@
+{% extends "panel/base.html" %}
+{% block titulo %}Mi tablero - OBSERVAPAZ{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h4 class="mb-0" id="tituloTablero">
+      {% if obs_usuario %}Tablero de {{ obs_usuario.codigo }} — {{ obs_usuario.nombre }}{% else %}Tablero de la Red (coordinación){% endif %}
+    </h4>
+    {% if not puede_filtrar %}
+      <small class="text-muted">Solo ves la información de tu observatorio.</small>
+    {% endif %}
+  </div>
+  {% if puede_filtrar %}
+  <div class="d-flex align-items-center gap-2">
+    <label for="selectObservatorio" class="form-label mb-0 small text-muted">Observatorio:</label>
+    <select id="selectObservatorio" class="form-select form-select-sm">
+      <option value="">Todos (Red completa)</option>
+    </select>
+  </div>
+  {% endif %}
+</div>
+
+<div class="alert alert-warning d-flex justify-content-between align-items-center" id="avisoPendientes" style="display:none;">
+  <span>Tienes <strong id="contadorPendientes">0</strong> novedad(es) pendiente(s) de revisión. No cuentan en las cifras de abajo hasta que se aprueben.</span>
+  <a href="{% url 'panel:novedades' %}" class="btn btn-sm btn-warning">Ir a revisarlas</a>
+</div>
+
+<!-- Aviso emergente: solo aparece justo después de iniciar sesión, si hay pendientes -->
+<div class="modal fade" id="modalAlertas" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Novedades pendientes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Tienes <strong id="modalContadorAlertas">0</strong> novedad(es) pendiente(s) de revisión desde tu última visita.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Más tarde</button>
+        <a href="{% url 'panel:novedades' %}" class="btn btn-primary">Ir a revisarlas</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card text-center h-100"><div class="card-body">
+      <h6 class="text-muted small text-uppercase">Observatorios</h6>
+      <h2 class="mb-0" id="totalObservatorios">—</h2>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center h-100"><div class="card-body">
+      <h6 class="text-muted small text-uppercase">Indicadores</h6>
+      <h2 class="mb-0" id="totalIndicadores">—</h2>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center h-100"><div class="card-body">
+      <h6 class="text-muted small text-uppercase">Registros capturados</h6>
+      <h2 class="mb-0" id="totalRegistros">—</h2>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header">Registros por observatorio</div>
+      <div class="card-body"><canvas id="gObservatorios" height="120"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">Distribución por categoría</div>
+      <div class="card-body"><canvas id="gCategorias" height="200"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Evolución mensual de registros</div>
+  <div class="card-body"><canvas id="gMeses" height="80"></canvas></div>
+</div>
+
+<div class="card">
+  <div class="card-header">Detalle de indicadores</div>
+  <div class="table-responsive">
+    <table class="table table-striped table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Observatorio</th><th>Indicador</th><th>Categoría</th>
+          <th>Último valor</th><th>Promedio</th><th>Meta</th><th>Registros</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="filasIndicadores">
+        <tr><td colspan="8" class="text-center text-muted py-4">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const obsFijo = {% if obs_usuario %}{{ obs_usuario.id }}{% else %}null{% endif %};
+const mostrarAvisoLogin = {% if mostrar_aviso_pendientes %}true{% else %}false{% endif %};
+const paleta = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14','#6610f2'];
+let graficos = {};
+
+async function obtenerTodasPaginas(url) {
+  let resultados = [];
+  while (url) {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (Array.isArray(data)) { resultados = resultados.concat(data); url = null; }
+    else { resultados = resultados.concat(data.results || []); url = data.next; }
+  }
+  return resultados;
+}
+
+function dibujarChart(id, tipo, labels, data, opciones) {
+  if (graficos[id]) { graficos[id].destroy(); }
+  let dataset;
+  if (tipo === 'doughnut') {
+    dataset = { data: data, backgroundColor: paleta };
+  } else if (tipo === 'line') {
+    dataset = { label: 'Registros', data: data, borderColor: '#198754',
+                backgroundColor: 'rgba(25,135,84,.1)', fill: true, tension: 0.3 };
+  } else {
+    dataset = { label: 'Registros', data: data, backgroundColor: '#0d6efd' };
+  }
+  graficos[id] = new Chart(document.getElementById(id), {
+    type: tipo,
+    data: { labels: labels, datasets: [dataset] },
+    options: opciones,
+  });
+}
+
+async function cargarTablero(observatorioId) {
+  const params = observatorioId ? `?indicador__observatorio=${observatorioId}` : '';
+
+  const [resumen, indicadores] = await Promise.all([
+    fetch(`/api/registros/resumen/${params}`).then(r => r.json()),
+    fetch(`/api/indicadores/resumen/${observatorioId ? '?observatorio=' + observatorioId : ''}`).then(r => r.json()),
+  ]);
+
+  document.getElementById('totalObservatorios').textContent = resumen.total_observatorios;
+  document.getElementById('totalIndicadores').textContent = resumen.total_indicadores;
+  document.getElementById('totalRegistros').textContent = resumen.total_registros;
+
+  dibujarChart('gObservatorios', 'bar', resumen.por_observatorio.labels, resumen.por_observatorio.data,
+    { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
+  dibujarChart('gCategorias', 'doughnut', resumen.por_categoria.labels, resumen.por_categoria.data,
+    { responsive: true, plugins: { legend: { position: 'bottom' } } });
+  dibujarChart('gMeses', 'line', resumen.por_mes.labels, resumen.por_mes.data,
+    { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
+
+  const filas = document.getElementById('filasIndicadores');
+  if (indicadores.length === 0) {
+    filas.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Aún no hay indicadores registrados.</td></tr>';
+    return;
+  }
+  filas.innerHTML = indicadores.map(ind => `
+    <tr>
+      <td><span class="badge bg-secondary">${ind.observatorio_codigo}</span></td>
+      <td>${ind.nombre}</td>
+      <td>${ind.categoria_nombre || '—'}</td>
+      <td>${ind.ultimo_valor ?? '—'} ${ind.unidad || ''}</td>
+      <td>${ind.promedio ?? '—'}</td>
+      <td>${ind.meta ?? '—'}</td>
+      <td>${ind.total_registros}</td>
+      <td><a href="/indicador/${ind.id}/" class="btn btn-sm btn-outline-primary">Ver serie</a></td>
+    </tr>
+  `).join('');
+}
+
+async function cargarPendientes() {
+  const pendientes = await obtenerTodasPaginas('/api/registros/pendientes/');
+  const aviso = document.getElementById('avisoPendientes');
+
+  document.getElementById('contadorPendientes').textContent = pendientes.length;
+  aviso.style.display = pendientes.length ? '' : 'none';
+
+  // El aviso emergente solo se muestra justo después de iniciar sesión
+  // (mostrarAvisoLogin ya viene "consumido" del lado de Django, así que
+  // no reaparece si simplemente recargas la página).
+  if (mostrarAvisoLogin && pendientes.length > 0) {
+    document.getElementById('modalContadorAlertas').textContent = pendientes.length;
+    new bootstrap.Modal(document.getElementById('modalAlertas')).show();
+  }
+}
+
+(async function iniciar() {
+  cargarPendientes();
+  {% if puede_filtrar %}
+  const select = document.getElementById('selectObservatorio');
+  const observatorios = await obtenerTodasPaginas('/api/observatorios/?activo=true');
+  observatorios.forEach(obs => {
+    const opt = document.createElement('option');
+    opt.value = obs.id;
+    opt.textContent = `${obs.codigo} - ${obs.nombre}`;
+    select.appendChild(opt);
+  });
+  select.addEventListener('change', () => cargarTablero(select.value || null));
+  cargarTablero(null);
+  {% else %}
+  cargarTablero(obsFijo);
+  {% endif %}
+})();
+</script>
+{% endblock %}

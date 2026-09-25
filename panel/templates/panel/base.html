@@ -23,15 +23,22 @@
     </div>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="{% url 'panel:dashboard' %}">OBSERVAPAZ</a>
+            <a class="navbar-brand fw-bold" href="{% url 'panel:publico' %}">OBSERVAPAZ</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="nav">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'panel:publico' %}">Tablero público</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'panel:formularios' %}">Formularios</a></li>
                     {% if user.is_authenticated %}
-                        <li class="nav-item"><a class="nav-link" href="{% url 'panel:dashboard' %}">Tablero</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'panel:tablero' %}">Mi tablero</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link position-relative" href="{% url 'panel:novedades' %}">
+                                Novedades
+                                <span id="badgeNovedades" class="badge rounded-pill bg-danger" style="display:none;">0</span>
+                            </a>
+                        </li>
                         <li class="nav-item"><a class="nav-link" href="/admin/">Administración</a></li>
                         <li class="nav-item">
                             <form method="post" action="{% url 'panel:logout' %}" class="d-inline">
@@ -59,6 +66,22 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    {% if user.is_authenticated %}
+    <script>
+        // Corre en cualquier página (no solo el tablero) para que el
+        // contador de "Novedades" del menú esté siempre al día.
+        fetch('/api/registros/pendientes/')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('badgeNovedades');
+                if (badge && data.length > 0) {
+                    badge.textContent = data.length;
+                    badge.style.display = 'inline-block';
+                }
+            })
+            .catch(() => {});
+    </script>
+    {% endif %}
     {% block scripts %}{% endblock %}
 </body>
 </html>

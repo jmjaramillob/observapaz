@@ -7,6 +7,7 @@ app_name = "panel"
 
 urlpatterns = [
     # --- Zona pública (sin login) ---
+    path("", views.tablero_publico, name="publico"),
     path("formularios/", views.lista_formularios, name="formularios"),
     path("formulario/", views.formulario_publico, name="formulario_general"),
     path("formulario/<str:codigo>/", views.formulario_publico, name="formulario_publico"),
@@ -20,6 +21,7 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
 
     # --- Zona privada (requiere login) ---
-    path("", views.dashboard, name="dashboard"),
+    path("tablero/", views.tablero, name="tablero"),
+    path("novedades/", views.novedades, name="novedades"),
     path("indicador/<int:indicador_id>/", views.detalle_indicador, name="detalle_indicador"),
 ]

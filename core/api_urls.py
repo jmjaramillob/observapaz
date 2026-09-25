@@ -12,7 +12,10 @@ router = DefaultRouter()
 router.register("observatorios", ObservatorioViewSet)
 router.register("categorias", CategoriaIndicadorViewSet)
 router.register("indicadores", IndicadorViewSet)
-router.register("registros", RegistroIndicadorViewSet)
-router.register("envios-odk", EnvioODKViewSet)
+# Estos dos calculan su queryset en get_queryset() (según el usuario que
+# consulta), así que el router no puede adivinar el basename solo y hay
+# que indicárselo.
+router.register("registros", RegistroIndicadorViewSet, basename="registro")
+router.register("envios-odk", EnvioODKViewSet, basename="envioodk")
 
 urlpatterns = router.urls

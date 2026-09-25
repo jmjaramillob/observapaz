@@ -68,6 +68,11 @@ class Command(BaseCommand):
                         fuente=random.choice(
                             ["Visita de campo", "Acta comunitaria", "Reporte ODK", "Mesa técnica"]
                         ),
+                        # Datos de ejemplo: se crean ya aprobados, para que
+                        # se vean de una vez en los tableros. Los registros
+                        # que lleguen por el formulario público sí quedan
+                        # pendientes de revisión (comportamiento normal).
+                        estado=RegistroIndicador.EstadoRegistro.APROBADO,
                     )
                     creados += 1
 

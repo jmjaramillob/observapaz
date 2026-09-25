@@ -1,14 +1,8 @@
-import json
-
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Count, Max, Sum
-from django.db.models.functions import TruncMonth
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, render
 
-from core.models import CategoriaIndicador, Indicador, Observatorio, RegistroIndicador
-
-from .forms import RegistroPublicoForm
+from core.models import Indicador, Observatorio
+from core.utils import observatorio_del_usuario
 
 
 # ---------------------------------------------------------------------------
@@ -24,114 +18,85 @@ def lista_formularios(request):
 
 def formulario_publico(request, codigo=None):
     """
-    Formulario de captura abierto. Si se entra con el código de un
-    observatorio (ej. /formulario/OBS-001/), solo muestra sus indicadores.
+    Muestra el formulario de captura. El HTML solo sirve de "cascarón":
+    la lista de indicadores se carga con JavaScript desde
+    GET /api/indicadores/, y el envío se hace con POST /api/registros/
+    -Django ya no procesa el formulario aquí-.
     """
     observatorio = None
     if codigo:
         observatorio = get_object_or_404(Observatorio, codigo__iexact=codigo, activo=True)
 
-    if request.method == "POST":
-        form = RegistroPublicoForm(request.POST, observatorio=observatorio)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "¡Gracias! El registro se guardó correctamente.")
-            return redirect(request.path)
-    else:
-        form = RegistroPublicoForm(observatorio=observatorio)
-
     return render(
         request,
         "panel/formulario_publico.html",
-        {"form": form, "observatorio": observatorio},
+        {"observatorio": observatorio},
     )
 
 
 # ---------------------------------------------------------------------------
-# ZONA PRIVADA: dashboard con indicadores y gráficos (requiere login)
+# ZONA PRIVADA: tablero (requiere login). Django solo protege el acceso
+# y le dice al JavaScript a qué observatorio está limitado el usuario;
+# los datos en sí los trae la página con fetch() contra la API.
 # ---------------------------------------------------------------------------
+
+
+def tablero_publico(request):
+    """Tablero consolidado PÚBLICO (sin login). Cifras agregadas, vía API."""
+    return render(request, "panel/tablero_publico.html")
 
 
 @login_required
-def dashboard(request):
-    """Tablero consolidado de la Red. Solo para usuarios autenticados."""
-    observatorio_id = request.GET.get("observatorio")
+def tablero(request):
+    """
+    Tablero privado. Si el usuario pertenece a un observatorio, el
+    JavaScript queda limitado a consultar solo esos datos (la API,
+    de todas formas, lo exigiría aunque el HTML intentara pedir otra
+    cosa). Si es de coordinación, puede moverse entre los 24.
 
-    observatorios = Observatorio.objects.filter(activo=True).order_by("codigo")
-
-    indicadores = Indicador.objects.select_related("observatorio", "categoria").filter(
-        activo=True
-    )
-    registros = RegistroIndicador.objects.all()
-
-    if observatorio_id:
-        indicadores = indicadores.filter(observatorio_id=observatorio_id)
-        registros = registros.filter(indicador__observatorio_id=observatorio_id)
-
-    indicadores = indicadores.annotate(
-        ultimo_valor=Max("registros__valor"),
-        promedio=Avg("registros__valor"),
-        total_registros=Count("registros"),
-    )
-
-    # --- Gráfico 1: registros por observatorio (barras) ---
-    por_observatorio = (
-        Observatorio.objects.filter(activo=True)
-        .annotate(total=Count("indicadores__registros"))
-        .order_by("codigo")
-    )
-    g_obs_labels = [o.codigo for o in por_observatorio]
-    g_obs_data = [o.total for o in por_observatorio]
-
-    # --- Gráfico 2: distribución por categoría (dona) ---
-    por_categoria = (
-        CategoriaIndicador.objects.annotate(total=Count("indicadores__registros"))
-        .filter(total__gt=0)
-        .order_by("-total")
-    )
-    g_cat_labels = [c.nombre for c in por_categoria]
-    g_cat_data = [c.total for c in por_categoria]
-
-    # --- Gráfico 3: evolución mensual de registros (línea) ---
-    por_mes = (
-        registros.annotate(mes=TruncMonth("fecha"))
-        .values("mes")
-        .annotate(total=Count("id"))
-        .order_by("mes")
-    )
-    g_mes_labels = [r["mes"].strftime("%Y-%m") for r in por_mes if r["mes"]]
-    g_mes_data = [r["total"] for r in por_mes if r["mes"]]
-
+    Como esta es la página a la que redirige el login, aquí es donde se
+    "consume" la marca de sesión que dispara el aviso emergente de
+    novedades pendientes -session.pop la borra, para que no vuelva a
+    aparecer hasta el próximo inicio de sesión-.
+    """
+    obs_usuario = observatorio_del_usuario(request.user)
     contexto = {
-        "observatorios": observatorios,
-        "indicadores": indicadores,
-        "observatorio_seleccionado": int(observatorio_id) if observatorio_id else None,
-        "total_observatorios": observatorios.count(),
-        "total_indicadores": indicadores.count(),
-        "total_registros": registros.count(),
-        "g_obs_labels": json.dumps(g_obs_labels),
-        "g_obs_data": json.dumps(g_obs_data),
-        "g_cat_labels": json.dumps(g_cat_labels),
-        "g_cat_data": json.dumps(g_cat_data),
-        "g_mes_labels": json.dumps(g_mes_labels),
-        "g_mes_data": json.dumps(g_mes_data),
+        "obs_usuario": obs_usuario,
+        "puede_filtrar": obs_usuario is None,
+        "mostrar_aviso_pendientes": request.session.pop("mostrar_aviso_pendientes", False),
     }
-    return render(request, "panel/dashboard.html", contexto)
+    return render(request, "panel/tablero_privado.html", contexto)
+
+
+@login_required
+def novedades(request):
+    """
+    Bandeja de novedades pendientes: la página dedicada a revisarlas y
+    decidir si son válidas (a diferencia del tablero, que solo muestra
+    un resumen con el enlace hacia aquí).
+    """
+    return render(request, "panel/novedades.html")
 
 
 @login_required
 def detalle_indicador(request, indicador_id):
-    """Tablero individual de un indicador: su serie histórica."""
-    indicador = get_object_or_404(
-        Indicador.objects.select_related("observatorio", "categoria"), pk=indicador_id
-    )
-    registros = indicador.registros.order_by("fecha")
+    """
+    Tablero individual de un indicador. Django sigue siendo quien
+    decide si el usuario puede ENTRAR a esta página (404 si el
+    indicador es de otro observatorio) -eso no se puede dejar solo en
+    manos de JavaScript, que cualquiera podría manipular-. Una vez
+    dentro, el historial de valores se trae con fetch() a la API,
+    que vuelve a validar el mismo acceso de forma independiente.
+    """
+    obs_usuario = observatorio_del_usuario(request.user)
+
+    qs = Indicador.objects.select_related("observatorio", "categoria")
+    if obs_usuario:
+        qs = qs.filter(observatorio=obs_usuario)
+
+    indicador = get_object_or_404(qs, pk=indicador_id)
 
     contexto = {
         "indicador": indicador,
-        "registros": registros,
-        "fechas": json.dumps([r.fecha.isoformat() for r in registros]),
-        "valores": json.dumps([r.valor for r in registros]),
-        "meta": indicador.meta,
     }
     return render(request, "panel/detalle_indicador.html", contexto)

@@ -1,0 +1,129 @@
+{% extends "panel/base.html" %}
+{% block titulo %}Tablero público - OBSERVAPAZ{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Tablero consolidado — Red de Observatorios para la Paz Territorial</h4>
+    <small class="text-muted">Información pública y agregada de toda la Red.</small>
+  </div>
+  {% if not user.is_authenticated %}
+  <a href="{% url 'panel:login' %}" class="btn btn-sm btn-outline-dark">Ingresar (equipo interno)</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card text-center h-100"><div class="card-body">
+      <h6 class="text-muted small text-uppercase">Observatorios activos</h6>
+      <h2 class="mb-0" id="totalObservatorios">—</h2>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center h-100"><div class="card-body">
+      <h6 class="text-muted small text-uppercase">Indicadores</h6>
+      <h2 class="mb-0" id="totalIndicadores">—</h2>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center h-100"><div class="card-body">
+      <h6 class="text-muted small text-uppercase">Registros capturados</h6>
+      <h2 class="mb-0" id="totalRegistros">—</h2>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header">Registros por observatorio</div>
+      <div class="card-body"><canvas id="gObservatorios" height="120"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">Distribución por categoría</div>
+      <div class="card-body"><canvas id="gCategorias" height="200"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Evolución mensual de registros</div>
+  <div class="card-body"><canvas id="gMeses" height="80"></canvas></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Resumen de indicadores</div>
+  <div class="table-responsive">
+    <table class="table table-striped mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Observatorio</th><th>Indicador</th><th>Categoría</th><th>Último valor</th><th>Meta</th></tr>
+      </thead>
+      <tbody id="filasIndicadores">
+        <tr><td colspan="5" class="text-center text-muted py-4">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted small">
+    Este resumen es público. El detalle completo de cada registro (fuente, observaciones, ubicación) solo es visible para el equipo de cada observatorio, previo inicio de sesión.
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const paleta = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14','#6610f2'];
+
+function dibujarChart(id, tipo, labels, data, opciones) {
+  let dataset;
+  if (tipo === 'doughnut') {
+    dataset = { data: data, backgroundColor: paleta };
+  } else if (tipo === 'line') {
+    dataset = { label: 'Registros', data: data, borderColor: '#198754',
+                backgroundColor: 'rgba(25,135,84,.1)', fill: true, tension: 0.3 };
+  } else {
+    dataset = { label: 'Registros', data: data, backgroundColor: '#0d6efd' };
+  }
+  new Chart(document.getElementById(id), {
+    type: tipo,
+    data: { labels: labels, datasets: [dataset] },
+    options: opciones,
+  });
+}
+
+async function cargarTableroPublico() {
+  const [resumen, indicadores] = await Promise.all([
+    fetch('/api/registros/resumen/').then(r => r.json()),
+    fetch('/api/indicadores/resumen/').then(r => r.json()),
+  ]);
+
+  document.getElementById('totalObservatorios').textContent = resumen.total_observatorios;
+  document.getElementById('totalIndicadores').textContent = resumen.total_indicadores;
+  document.getElementById('totalRegistros').textContent = resumen.total_registros;
+
+  dibujarChart('gObservatorios', 'bar', resumen.por_observatorio.labels, resumen.por_observatorio.data,
+    { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
+  dibujarChart('gCategorias', 'doughnut', resumen.por_categoria.labels, resumen.por_categoria.data,
+    { responsive: true, plugins: { legend: { position: 'bottom' } } });
+  dibujarChart('gMeses', 'line', resumen.por_mes.labels, resumen.por_mes.data,
+    { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
+
+  const filas = document.getElementById('filasIndicadores');
+  if (indicadores.length === 0) {
+    filas.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Aún no hay indicadores registrados.</td></tr>';
+    return;
+  }
+  filas.innerHTML = indicadores.map(ind => `
+    <tr>
+      <td><span class="badge bg-secondary">${ind.observatorio_codigo}</span></td>
+      <td>${ind.nombre}</td>
+      <td>${ind.categoria_nombre || '—'}</td>
+      <td>${ind.ultimo_valor ?? '—'} ${ind.unidad || ''}</td>
+      <td>${ind.meta ?? '—'}</td>
+    </tr>
+  `).join('');
+}
+cargarTableroPublico();
+</script>
+{% endblock %}
