@@ -1,12 +1,12 @@
 {% extends "panel/base.html" %}
-{% block titulo %}Formulario de captura - OBSERVAPAZ{% endblock %}
+{% block titulo %}Reportar un caso - OBSERVAPAZ{% endblock %}
 
 {% block contenido %}
 <div class="row justify-content-center">
-  <div class="col-lg-7">
+  <div class="col-lg-8">
     <div class="card shadow-sm">
       <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">Registro de información</h5>
+        <h5 class="mb-0">Reportar un caso</h5>
         {% if observatorio %}
           <small>{{ observatorio.codigo }} — {{ observatorio.nombre }}</small>
         {% else %}
@@ -14,45 +14,170 @@
         {% endif %}
       </div>
       <div class="card-body">
-        <p class="text-muted small">
-          Diligencia este formulario desde cualquier dispositivo. No necesitas usuario ni contraseña.
-        </p>
+        <div class="alert alert-secondary small">
+          No incluyas nombres ni datos que permitan identificar a las personas afectadas.
+          Este reporte queda pendiente de revisión por el equipo del observatorio antes de
+          contar en cualquier cifra.
+        </div>
 
         <div id="alertaEnvio"></div>
 
-        <form id="formRegistro" novalidate>
+        <form id="formCaso" novalidate>
+          {% if not observatorio %}
+          <h6 class="text-muted">Observatorio</h6>
           <div class="mb-3">
-            <label for="id_indicador" class="form-label">Indicador</label>
-            <select id="id_indicador" class="form-select" required>
-              <option value="">Cargando indicadores…</option>
+            <label for="id_observatorio" class="form-label">¿A qué observatorio corresponde este caso?</label>
+            <select id="id_observatorio" class="form-select" required>
+              <option value="">Cargando observatorios…</option>
+            </select>
+          </div>
+          {% endif %}
+
+          <h6 class="text-muted mt-4">Datos del hecho</h6>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_fecha_hecho" class="form-label">Fecha en que ocurrió el hecho</label>
+              <input type="date" id="id_fecha_hecho" class="form-control" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_zona" class="form-label">Zona</label>
+              <select id="id_zona" class="form-select">
+                <option value="">Sin especificar</option>
+                <option value="rural">Rural</option>
+                <option value="urbana">Urbana</option>
+                <option value="centro_poblado">Centro poblado</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="id_vereda" class="form-label">Vereda, corregimiento o barrio</label>
+            <input type="text" id="id_vereda" class="form-control">
+          </div>
+
+          <h6 class="text-muted mt-4">Tipo de hecho y presunto responsable</h6>
+          <div class="mb-3">
+            <label for="id_tipo_hecho" class="form-label">Tipo de hecho</label>
+            <select id="id_tipo_hecho" class="form-select" required>
+              <option value="">Cargando…</option>
             </select>
           </div>
           <div class="mb-3">
-            <label for="id_fecha" class="form-label">Fecha del dato</label>
-            <input type="date" id="id_fecha" class="form-control" required>
+            <label for="id_tipo_hecho_otro" class="form-label">Si eligió "Otro", especifique</label>
+            <input type="text" id="id_tipo_hecho_otro" class="form-control">
           </div>
-          <div class="mb-3">
-            <label for="id_valor" class="form-label">Valor registrado</label>
-            <input type="number" step="any" id="id_valor" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label for="id_fuente" class="form-label">Fuente de la información</label>
-            <input type="text" id="id_fuente" class="form-control" placeholder="Ej: Acta comunitaria, visita de campo">
-          </div>
-          <div class="mb-3">
-            <label for="id_observaciones" class="form-label">Observaciones</label>
-            <textarea id="id_observaciones" class="form-control" rows="3"></textarea>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_responsable" class="form-label">Presunto responsable</label>
+              <select id="id_responsable" class="form-select">
+                <option value="">Sin especificar</option>
+                <option value="grupo_armado_organizado">Grupo armado organizado</option>
+                <option value="agente_estado">Agente del Estado</option>
+                <option value="grupo_no_identificado">Grupo armado no identificado</option>
+                <option value="no_identificado">No identificado / desconocido</option>
+                <option value="no_aplica">No aplica</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_responsable_detalle" class="form-label">Detalle (opcional)</label>
+              <input type="text" id="id_responsable_detalle" class="form-control">
+            </div>
           </div>
 
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="usarUbicacion">
-            <label class="form-check-label" for="usarUbicacion">
-              Adjuntar mi ubicación actual (opcional)
+          <h6 class="text-muted mt-4">Población afectada (cifras, sin nombres)</h6>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Total personas afectadas</label>
+              <input type="number" min="0" id="id_num_personas" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Hombres</label>
+              <input type="number" min="0" id="id_num_hombres" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Mujeres</label>
+              <input type="number" min="0" id="id_num_mujeres" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Otro género</label>
+              <input type="number" min="0" id="id_num_otro_genero" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Niños, niñas y adolescentes</label>
+              <input type="number" min="0" id="id_num_ninos" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Adultos</label>
+              <input type="number" min="0" id="id_num_adultos" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Adultos mayores</label>
+              <input type="number" min="0" id="id_num_adultos_mayores" class="form-control">
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label small">Familias afectadas</label>
+              <input type="number" min="0" id="id_num_familias" class="form-control">
+            </div>
+          </div>
+
+          <h6 class="text-muted mt-4">Fuente y verificación</h6>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_fuente" class="form-label">Fuente de la información</label>
+              <input type="text" id="id_fuente" class="form-control" placeholder="Ej: comunidad, autoridad local, medios">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_verificacion" class="form-label">Nivel de verificación</label>
+              <select id="id_verificacion" class="form-select">
+                <option value="no_verificado">No verificado</option>
+                <option value="en_verificacion">En proceso de verificación</option>
+                <option value="confirmado">Confirmado</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="id_archivo" class="form-label">Documento de soporte (opcional)</label>
+            <input type="file" id="id_archivo" class="form-control">
+          </div>
+
+          <h6 class="text-muted mt-4">Descripción</h6>
+          <div class="mb-3">
+            <label for="id_descripcion" class="form-label">Descripción del hecho</label>
+            <textarea id="id_descripcion" class="form-control" rows="3" placeholder="Sin nombres ni datos que identifiquen a víctimas"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="id_afectaciones" class="form-label">Afectaciones materiales</label>
+            <textarea id="id_afectaciones" class="form-control" rows="2"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="id_necesidades" class="form-label">Necesidades inmediatas identificadas</label>
+            <textarea id="id_necesidades" class="form-control" rows="2"></textarea>
+          </div>
+
+          <h6 class="text-muted mt-4">Consentimiento y responsable del reporte</h6>
+          <div class="form-check mb-2">
+            <input type="checkbox" class="form-check-input" id="id_autorizacion" required>
+            <label class="form-check-label" for="id_autorizacion">
+              Se autorizó expresamente registrar este hecho <span class="text-danger">*</span>
             </label>
-            <div id="estadoUbicacion" class="form-text"></div>
+          </div>
+          <div class="form-check mb-3">
+            <input type="checkbox" class="form-check-input" id="id_reserva" checked>
+            <label class="form-check-label" for="id_reserva">
+              Este caso requiere manejo confidencial/reservado
+            </label>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_diligencia_nombre" class="form-label">Nombre de quien diligencia</label>
+              <input type="text" id="id_diligencia_nombre" class="form-control">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_diligencia_rol" class="form-label">Rol / cargo</label>
+              <input type="text" id="id_diligencia_rol" class="form-control">
+            </div>
           </div>
 
-          <button type="submit" class="btn btn-primary w-100 py-2" id="btnEnviar">Enviar registro</button>
+          <button type="submit" class="btn btn-primary w-100 py-2" id="btnEnviar">Enviar reporte</button>
         </form>
       </div>
     </div>
@@ -62,11 +187,6 @@
 
 {% block scripts %}
 <script>
-let latitud = null, longitud = null;
-
-// La API pagina los listados de a 50. Este ayudante junta todas las
-// páginas, para que un observatorio con muchos indicadores no se quede
-// con la lista incompleta en el desplegable.
 async function obtenerTodasPaginas(url) {
   let resultados = [];
   while (url) {
@@ -78,106 +198,98 @@ async function obtenerTodasPaginas(url) {
   return resultados;
 }
 
-// --- Cargar el listado de indicadores desde la API ---
-async function cargarIndicadores() {
-  const select = document.getElementById('id_indicador');
-  try {
-    let url = '/api/indicadores/?activo=true';
-    {% if observatorio %}
-    // Primero resolvemos el id del observatorio a partir de su código.
-    const observatorios = await obtenerTodasPaginas('/api/observatorios/?activo=true');
-    const obs = observatorios.find(o => o.codigo === "{{ observatorio.codigo }}");
-    if (obs) { url += `&observatorio=${obs.id}`; }
-    {% endif %}
-    const indicadores = await obtenerTodasPaginas(url);
-
-    select.innerHTML = '<option value="">Selecciona un indicador…</option>';
-    indicadores.forEach(ind => {
-      const opt = document.createElement('option');
-      opt.value = ind.id;
-      opt.textContent = ind.observatorio_codigo ? `${ind.observatorio_codigo} — ${ind.nombre}` : ind.nombre;
-      select.appendChild(opt);
-    });
-  } catch (e) {
-    select.innerHTML = '<option value="">No se pudo cargar la lista. Recarga la página.</option>';
-  }
-}
-cargarIndicadores();
-
-// --- Ubicación opcional ---
-document.getElementById('usarUbicacion').addEventListener('change', function () {
-  const estado = document.getElementById('estadoUbicacion');
-  if (!this.checked) {
-    latitud = null; longitud = null; estado.textContent = '';
-    return;
-  }
-  if (!navigator.geolocation) {
-    estado.textContent = 'Este dispositivo no permite obtener la ubicación.';
-    return;
-  }
-  estado.textContent = 'Obteniendo ubicación…';
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      latitud = pos.coords.latitude;
-      longitud = pos.coords.longitude;
-      estado.textContent = 'Ubicación capturada correctamente.';
-    },
-    () => { estado.textContent = 'No se pudo obtener la ubicación.'; }
-  );
-});
-
-// --- Envío del formulario directo a la API ---
 function obtenerCookie(nombre) {
   const match = document.cookie.match('(^|;)\\s*' + nombre + '\\s*=\\s*([^;]+)');
   return match ? match.pop() : '';
 }
 
-document.getElementById('formRegistro').addEventListener('submit', async function (e) {
+let observatorioId = {% if observatorio %}{{ observatorio.id }}{% else %}null{% endif %};
+
+async function cargarObservatorios() {
+  const select = document.getElementById('id_observatorio');
+  if (!select) return;
+  const observatorios = await obtenerTodasPaginas('/api/observatorios/?activo=true');
+  select.innerHTML = '<option value="">Selecciona un observatorio…</option>';
+  observatorios.forEach(obs => {
+    const opt = document.createElement('option');
+    opt.value = obs.id;
+    opt.textContent = `${obs.codigo} - ${obs.nombre}`;
+    select.appendChild(opt);
+  });
+  select.addEventListener('change', () => { observatorioId = select.value; });
+}
+
+async function cargarTiposHecho() {
+  const select = document.getElementById('id_tipo_hecho');
+  const tipos = await obtenerTodasPaginas('/api/tipos-hecho/?activo=true');
+  select.innerHTML = '<option value="">Selecciona un tipo de hecho…</option>';
+  tipos.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.nombre;
+    select.appendChild(opt);
+  });
+}
+
+cargarObservatorios();
+cargarTiposHecho();
+
+document.getElementById('formCaso').addEventListener('submit', async function (e) {
   e.preventDefault();
   const boton = document.getElementById('btnEnviar');
   const alerta = document.getElementById('alertaEnvio');
   boton.disabled = true;
   boton.textContent = 'Enviando…';
 
-  const payload = {
-    indicador: document.getElementById('id_indicador').value,
-    fecha: document.getElementById('id_fecha').value,
-    valor: document.getElementById('id_valor').value,
-    fuente: document.getElementById('id_fuente').value,
-    observaciones: document.getElementById('id_observaciones').value,
-    latitud: latitud,
-    longitud: longitud,
-  };
+  const formData = new FormData();
+  formData.append('observatorio', observatorioId || '');
+  formData.append('fecha_hecho', document.getElementById('id_fecha_hecho').value);
+  formData.append('zona', document.getElementById('id_zona').value);
+  formData.append('vereda_corregimiento_barrio', document.getElementById('id_vereda').value);
+  formData.append('tipo_hecho', document.getElementById('id_tipo_hecho').value);
+  formData.append('tipo_hecho_otro', document.getElementById('id_tipo_hecho_otro').value);
+  formData.append('presunto_responsable', document.getElementById('id_responsable').value);
+  formData.append('presunto_responsable_detalle', document.getElementById('id_responsable_detalle').value);
+  formData.append('num_personas_afectadas', document.getElementById('id_num_personas').value);
+  formData.append('num_hombres', document.getElementById('id_num_hombres').value);
+  formData.append('num_mujeres', document.getElementById('id_num_mujeres').value);
+  formData.append('num_otro_genero', document.getElementById('id_num_otro_genero').value);
+  formData.append('num_ninos_adolescentes', document.getElementById('id_num_ninos').value);
+  formData.append('num_adultos', document.getElementById('id_num_adultos').value);
+  formData.append('num_adultos_mayores', document.getElementById('id_num_adultos_mayores').value);
+  formData.append('num_familias_afectadas', document.getElementById('id_num_familias').value);
+  formData.append('fuente', document.getElementById('id_fuente').value);
+  formData.append('nivel_verificacion', document.getElementById('id_verificacion').value);
+  formData.append('descripcion', document.getElementById('id_descripcion').value);
+  formData.append('afectaciones_materiales', document.getElementById('id_afectaciones').value);
+  formData.append('necesidades_identificadas', document.getElementById('id_necesidades').value);
+  formData.append('autorizacion_registro', document.getElementById('id_autorizacion').checked);
+  formData.append('requiere_reserva', document.getElementById('id_reserva').checked);
+  formData.append('diligencia_nombre', document.getElementById('id_diligencia_nombre').value);
+  formData.append('diligencia_rol', document.getElementById('id_diligencia_rol').value);
+  const archivo = document.getElementById('id_archivo').files[0];
+  if (archivo) { formData.append('archivo_soporte', archivo); }
 
-  // Para un visitante anónimo esto no hace falta (la API no exige CSRF
-  // sin sesión iniciada), pero si alguien del equipo interno usa este
-  // mismo formulario público con su sesión activa, sí se requiere.
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {};
   const csrftoken = obtenerCookie('csrftoken');
   if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
 
   try {
-    const resp = await fetch('/api/registros/', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload),
-    });
+    const resp = await fetch('/api/casos/', { method: 'POST', headers: headers, body: formData });
 
     if (resp.ok) {
-      alerta.innerHTML = '<div class="alert alert-success">¡Gracias! El registro se guardó correctamente.</div>';
-      document.getElementById('formRegistro').reset();
-      latitud = null; longitud = null;
-      document.getElementById('estadoUbicacion').textContent = '';
+      alerta.innerHTML = '<div class="alert alert-success">¡Gracias! El reporte se guardó correctamente y quedó pendiente de revisión.</div>';
+      document.getElementById('formCaso').reset();
     } else {
       const errores = await resp.json();
-      const detalle = Object.entries(errores).map(([campo, msgs]) => `${campo}: ${msgs.join(' ')}`).join('<br>');
-      alerta.innerHTML = `<div class="alert alert-danger">No se pudo guardar el registro:<br>${detalle}</div>`;
+      const detalle = Object.entries(errores).map(([campo, msgs]) => `${campo}: ${Array.isArray(msgs) ? msgs.join(' ') : msgs}`).join('<br>');
+      alerta.innerHTML = `<div class="alert alert-danger">No se pudo guardar el reporte:<br>${detalle}</div>`;
     }
   } catch (e) {
     alerta.innerHTML = '<div class="alert alert-danger">Error de conexión. Intenta de nuevo.</div>';
   } finally {
     boton.disabled = false;
-    boton.textContent = 'Enviar registro';
+    boton.textContent = 'Enviar reporte';
   }
 });
 </script>

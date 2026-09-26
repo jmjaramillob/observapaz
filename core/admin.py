@@ -1,15 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
+from django.utils import timezone
 
-from .models import (
-    CategoriaIndicador,
-    EnvioODK,
-    Indicador,
-    Observatorio,
-    PerfilUsuario,
-    RegistroIndicador,
-)
+from .models import CasoVictimizante, EnvioODK, Observatorio, PerfilUsuario, TipoHecho
 
 
 @admin.register(Observatorio)
@@ -19,42 +13,36 @@ class ObservatorioAdmin(admin.ModelAdmin):
     list_filter = ("activo", "departamento")
 
 
-@admin.register(CategoriaIndicador)
-class CategoriaIndicadorAdmin(admin.ModelAdmin):
-    list_display = ("nombre",)
+@admin.register(TipoHecho)
+class TipoHechoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "orden", "activo")
+    list_editable = ("orden", "activo")
     search_fields = ("nombre",)
 
 
-@admin.register(Indicador)
-class IndicadorAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "observatorio", "categoria", "unidad", "meta", "activo")
-    list_filter = ("observatorio", "categoria", "activo")
-    search_fields = ("nombre",)
-
-
-@admin.register(RegistroIndicador)
-class RegistroIndicadorAdmin(admin.ModelAdmin):
-    list_display = ("indicador", "fecha", "valor", "fuente", "estado")
-    list_filter = ("estado", "indicador__observatorio", "fecha")
-    date_hierarchy = "fecha"
+@admin.register(CasoVictimizante)
+class CasoVictimizanteAdmin(admin.ModelAdmin):
+    list_display = (
+        "tipo_hecho", "observatorio", "fecha_hecho", "num_personas_afectadas",
+        "nivel_verificacion", "estado",
+    )
+    list_filter = ("estado", "tipo_hecho", "observatorio", "nivel_verificacion", "requiere_reserva")
+    search_fields = ("descripcion", "vereda_corregimiento_barrio")
+    date_hierarchy = "fecha_hecho"
     actions = ["aprobar_seleccionados", "rechazar_seleccionados"]
 
     @admin.action(description="Marcar seleccionados como aprobados")
     def aprobar_seleccionados(self, request, queryset):
-        from django.utils import timezone
-
         queryset.update(
-            estado=RegistroIndicador.EstadoRegistro.APROBADO,
+            estado=CasoVictimizante.EstadoRevision.APROBADO,
             revisado_por=request.user,
             revisado_en=timezone.now(),
         )
 
     @admin.action(description="Marcar seleccionados como rechazados")
     def rechazar_seleccionados(self, request, queryset):
-        from django.utils import timezone
-
         queryset.update(
-            estado=RegistroIndicador.EstadoRegistro.RECHAZADO,
+            estado=CasoVictimizante.EstadoRevision.RECHAZADO,
             revisado_por=request.user,
             revisado_en=timezone.now(),
         )

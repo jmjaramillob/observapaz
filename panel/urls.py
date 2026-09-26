@@ -23,5 +23,5 @@ urlpatterns = [
     # --- Zona privada (requiere login) ---
     path("tablero/", views.tablero, name="tablero"),
     path("novedades/", views.novedades, name="novedades"),
-    path("indicador/<int:indicador_id>/", views.detalle_indicador, name="detalle_indicador"),
+    path("caso/<int:caso_id>/", views.detalle_caso, name="detalle_caso"),
 ]

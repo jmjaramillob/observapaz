@@ -22,8 +22,8 @@
 </div>
 
 <div class="alert alert-warning d-flex justify-content-between align-items-center" id="avisoPendientes" style="display:none;">
-  <span>Tienes <strong id="contadorPendientes">0</strong> novedad(es) pendiente(s) de revisión. No cuentan en las cifras de abajo hasta que se aprueben.</span>
-  <a href="{% url 'panel:novedades' %}" class="btn btn-sm btn-warning">Ir a revisarlas</a>
+  <span>Tienes <strong id="contadorPendientes">0</strong> caso(s) pendiente(s) de revisión. No cuentan en las cifras de abajo hasta que se aprueben.</span>
+  <a href="{% url 'panel:novedades' %}" class="btn btn-sm btn-warning">Ir a revisarlos</a>
 </div>
 
 <!-- Aviso emergente: solo aparece justo después de iniciar sesión, si hay pendientes -->
@@ -31,15 +31,15 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Novedades pendientes</h5>
+        <h5 class="modal-title">Casos pendientes</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
-        <p class="mb-0">Tienes <strong id="modalContadorAlertas">0</strong> novedad(es) pendiente(s) de revisión desde tu última visita.</p>
+        <p class="mb-0">Tienes <strong id="modalContadorAlertas">0</strong> caso(s) pendiente(s) de revisión desde tu última visita.</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Más tarde</button>
-        <a href="{% url 'panel:novedades' %}" class="btn btn-primary">Ir a revisarlas</a>
+        <a href="{% url 'panel:novedades' %}" class="btn btn-primary">Ir a revisarlos</a>
       </div>
     </div>
   </div>
@@ -54,14 +54,14 @@
   </div>
   <div class="col-md-4">
     <div class="card text-center h-100"><div class="card-body">
-      <h6 class="text-muted small text-uppercase">Indicadores</h6>
-      <h2 class="mb-0" id="totalIndicadores">—</h2>
+      <h6 class="text-muted small text-uppercase">Casos aprobados</h6>
+      <h2 class="mb-0" id="totalCasos">—</h2>
     </div></div>
   </div>
   <div class="col-md-4">
     <div class="card text-center h-100"><div class="card-body">
-      <h6 class="text-muted small text-uppercase">Registros capturados</h6>
-      <h2 class="mb-0" id="totalRegistros">—</h2>
+      <h6 class="text-muted small text-uppercase">Personas afectadas</h6>
+      <h2 class="mb-0" id="totalPersonas">—</h2>
     </div></div>
   </div>
 </div>
@@ -69,35 +69,35 @@
 <div class="row g-3 mb-4">
   <div class="col-lg-8">
     <div class="card h-100">
-      <div class="card-header">Registros por observatorio</div>
+      <div class="card-header">Casos por observatorio</div>
       <div class="card-body"><canvas id="gObservatorios" height="120"></canvas></div>
     </div>
   </div>
   <div class="col-lg-4">
     <div class="card h-100">
-      <div class="card-header">Distribución por categoría</div>
-      <div class="card-body"><canvas id="gCategorias" height="200"></canvas></div>
+      <div class="card-header">Casos por tipo de hecho</div>
+      <div class="card-body"><canvas id="gTipoHecho" height="200"></canvas></div>
     </div>
   </div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Evolución mensual de registros</div>
+  <div class="card-header">Evolución mensual de casos</div>
   <div class="card-body"><canvas id="gMeses" height="80"></canvas></div>
 </div>
 
 <div class="card">
-  <div class="card-header">Detalle de indicadores</div>
+  <div class="card-header">Casos registrados</div>
   <div class="table-responsive">
     <table class="table table-striped table-hover mb-0 align-middle">
       <thead class="table-light">
         <tr>
-          <th>Observatorio</th><th>Indicador</th><th>Categoría</th>
-          <th>Último valor</th><th>Promedio</th><th>Meta</th><th>Registros</th><th></th>
+          <th>Observatorio</th><th>Tipo de hecho</th><th>Fecha del hecho</th>
+          <th>Personas afectadas</th><th>Verificación</th><th>Estado</th><th></th>
         </tr>
       </thead>
-      <tbody id="filasIndicadores">
-        <tr><td colspan="8" class="text-center text-muted py-4">Cargando…</td></tr>
+      <tbody id="filasCasos">
+        <tr><td colspan="7" class="text-center text-muted py-4">Cargando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -111,6 +111,13 @@ const obsSubdominio = {% if obs_subdominio %}{{ obs_subdominio.id }}{% else %}nu
 const mostrarAvisoLogin = {% if mostrar_aviso_pendientes %}true{% else %}false{% endif %};
 const paleta = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14','#6610f2'];
 let graficos = {};
+
+const etiquetasVerificacion = {
+  confirmado: 'Confirmado', en_verificacion: 'En verificación', no_verificado: 'No verificado',
+};
+const etiquetasEstado = {
+  pendiente: 'Pendiente', aprobado: 'Aprobado', rechazado: 'Rechazado',
+};
 
 async function obtenerTodasPaginas(url) {
   let resultados = [];
@@ -129,10 +136,10 @@ function dibujarChart(id, tipo, labels, data, opciones) {
   if (tipo === 'doughnut') {
     dataset = { data: data, backgroundColor: paleta };
   } else if (tipo === 'line') {
-    dataset = { label: 'Registros', data: data, borderColor: '#198754',
+    dataset = { label: 'Casos', data: data, borderColor: '#198754',
                 backgroundColor: 'rgba(25,135,84,.1)', fill: true, tension: 0.3 };
   } else {
-    dataset = { label: 'Registros', data: data, backgroundColor: '#0d6efd' };
+    dataset = { label: 'Casos', data: data, backgroundColor: '#0d6efd' };
   }
   graficos[id] = new Chart(document.getElementById(id), {
     type: tipo,
@@ -142,53 +149,50 @@ function dibujarChart(id, tipo, labels, data, opciones) {
 }
 
 async function cargarTablero(observatorioId) {
-  const params = observatorioId ? `?indicador__observatorio=${observatorioId}` : '';
+  const params = observatorioId ? `?observatorio=${observatorioId}` : '';
 
-  const [resumen, indicadores] = await Promise.all([
-    fetch(`/api/registros/resumen/${params}`).then(r => r.json()),
-    fetch(`/api/indicadores/resumen/${observatorioId ? '?observatorio=' + observatorioId : ''}`).then(r => r.json()),
+  const [resumen, casos] = await Promise.all([
+    fetch(`/api/casos/resumen/${params}`).then(r => r.json()),
+    obtenerTodasPaginas(`/api/casos/${params}`),
   ]);
 
   document.getElementById('totalObservatorios').textContent = resumen.total_observatorios;
-  document.getElementById('totalIndicadores').textContent = resumen.total_indicadores;
-  document.getElementById('totalRegistros').textContent = resumen.total_registros;
+  document.getElementById('totalCasos').textContent = resumen.total_casos;
+  document.getElementById('totalPersonas').textContent = resumen.poblacion.personas;
 
   dibujarChart('gObservatorios', 'bar', resumen.por_observatorio.labels, resumen.por_observatorio.data,
     { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
-  dibujarChart('gCategorias', 'doughnut', resumen.por_categoria.labels, resumen.por_categoria.data,
+  dibujarChart('gTipoHecho', 'doughnut', resumen.por_tipo_hecho.labels, resumen.por_tipo_hecho.data,
     { responsive: true, plugins: { legend: { position: 'bottom' } } });
   dibujarChart('gMeses', 'line', resumen.por_mes.labels, resumen.por_mes.data,
     { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
 
-  const filas = document.getElementById('filasIndicadores');
-  if (indicadores.length === 0) {
-    filas.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Aún no hay indicadores registrados.</td></tr>';
+  const filas = document.getElementById('filasCasos');
+  if (casos.length === 0) {
+    filas.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Aún no hay casos registrados.</td></tr>';
     return;
   }
-  filas.innerHTML = indicadores.map(ind => `
+  casos.sort((a, b) => (b.fecha_hecho || '').localeCompare(a.fecha_hecho || ''));
+  filas.innerHTML = casos.map(c => `
     <tr>
-      <td><span class="badge bg-secondary">${ind.observatorio_codigo}</span></td>
-      <td>${ind.nombre}</td>
-      <td>${ind.categoria_nombre || '—'}</td>
-      <td>${ind.ultimo_valor ?? '—'} ${ind.unidad || ''}</td>
-      <td>${ind.promedio ?? '—'}</td>
-      <td>${ind.meta ?? '—'}</td>
-      <td>${ind.total_registros}</td>
-      <td><a href="/indicador/${ind.id}/" class="btn btn-sm btn-outline-primary">Ver serie</a></td>
+      <td><span class="badge bg-secondary">${c.observatorio_codigo}</span></td>
+      <td>${c.tipo_hecho_nombre || '—'}</td>
+      <td>${c.fecha_hecho}</td>
+      <td>${c.num_personas_afectadas ?? '—'}</td>
+      <td>${etiquetasVerificacion[c.nivel_verificacion] || '—'}</td>
+      <td><span class="badge ${c.estado === 'aprobado' ? 'bg-success' : c.estado === 'rechazado' ? 'bg-danger' : 'bg-warning text-dark'}">${etiquetasEstado[c.estado] || c.estado}</span></td>
+      <td><a href="/caso/${c.id}/" class="btn btn-sm btn-outline-primary">Ver detalle</a></td>
     </tr>
   `).join('');
 }
 
 async function cargarPendientes() {
-  const pendientes = await obtenerTodasPaginas('/api/registros/pendientes/');
+  const pendientes = await obtenerTodasPaginas('/api/casos/pendientes/');
   const aviso = document.getElementById('avisoPendientes');
 
   document.getElementById('contadorPendientes').textContent = pendientes.length;
   aviso.style.display = pendientes.length ? '' : 'none';
 
-  // El aviso emergente solo se muestra justo después de iniciar sesión
-  // (mostrarAvisoLogin ya viene "consumido" del lado de Django, así que
-  // no reaparece si simplemente recargas la página).
   if (mostrarAvisoLogin && pendientes.length > 0) {
     document.getElementById('modalContadorAlertas').textContent = pendientes.length;
     new bootstrap.Modal(document.getElementById('modalAlertas')).show();

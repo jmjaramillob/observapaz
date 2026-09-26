@@ -1,26 +1,17 @@
 {% extends "panel/base.html" %}
-{% block titulo %}Novedades pendientes - OBSERVAPAZ{% endblock %}
+{% block titulo %}Casos pendientes - OBSERVAPAZ{% endblock %}
 
 {% block contenido %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
-    <h4 class="mb-0">Bandeja de novedades pendientes</h4>
-    <small class="text-muted">Registros que llegaron por el formulario público y aún no cuentan en los tableros.</small>
+    <h4 class="mb-0">Bandeja de casos pendientes</h4>
+    <small class="text-muted">Casos que llegaron por el formulario público u ODK y aún no cuentan en los tableros.</small>
   </div>
   <a href="{% url 'panel:tablero' %}" class="btn btn-sm btn-outline-secondary">&larr; Volver al tablero</a>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead class="table-light">
-        <tr><th>Observatorio</th><th>Indicador</th><th>Fecha</th><th>Valor</th><th>Fuente</th><th>Observaciones</th><th style="width:220px"></th></tr>
-      </thead>
-      <tbody id="filasPendientes">
-        <tr><td colspan="7" class="text-center text-muted py-4">Cargando…</td></tr>
-      </tbody>
-    </table>
-  </div>
+<div id="listaPendientes">
+  <p class="text-center text-muted py-4">Cargando…</p>
 </div>
 {% endblock %}
 
@@ -42,56 +33,72 @@ async function obtenerTodasPaginas(url) {
   return resultados;
 }
 
+const etiquetasVerificacion = {
+  confirmado: 'Confirmado', en_verificacion: 'En verificación', no_verificado: 'No verificado',
+};
+
 async function cargarPendientes() {
-  const pendientes = await obtenerTodasPaginas('/api/registros/pendientes/');
-  const filas = document.getElementById('filasPendientes');
+  const pendientes = await obtenerTodasPaginas('/api/casos/pendientes/');
+  const contenedor = document.getElementById('listaPendientes');
 
   if (pendientes.length === 0) {
-    filas.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5">No hay novedades pendientes por revisar. 🎉</td></tr>';
+    contenedor.innerHTML = '<p class="text-center text-muted py-5">No hay casos pendientes por revisar. 🎉</p>';
     return;
   }
 
-  filas.innerHTML = pendientes.map(r => `
-    <tr id="fila-pendiente-${r.id}">
-      <td><span class="badge bg-secondary">${r.observatorio_codigo}</span></td>
-      <td>${r.indicador_nombre}</td>
-      <td>${r.fecha}</td>
-      <td>${r.valor}</td>
-      <td>${r.fuente || '—'}</td>
-      <td>${r.observaciones || '—'}</td>
-      <td>
-        <button class="btn btn-sm btn-success" onclick="decidirRegistro(${r.id}, 'aprobar')">Aprobar</button>
-        <button class="btn btn-sm btn-outline-danger" onclick="decidirRegistro(${r.id}, 'rechazar')">Rechazar</button>
-      </td>
-    </tr>
+  contenedor.innerHTML = pendientes.map(c => `
+    <div class="card mb-3" id="caso-${c.id}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+          <span class="badge bg-secondary">${c.observatorio_codigo}</span>
+          <strong>${c.tipo_hecho_nombre || '—'}</strong>
+          <span class="text-muted small">— ${c.fecha_hecho}</span>
+        </span>
+        <span class="badge bg-warning text-dark">${etiquetasVerificacion[c.nivel_verificacion] || c.nivel_verificacion}</span>
+      </div>
+      <div class="card-body">
+        <div class="row small mb-2">
+          <div class="col-md-3"><strong>Personas afectadas:</strong> ${c.num_personas_afectadas ?? '—'}</div>
+          <div class="col-md-3"><strong>Familias:</strong> ${c.num_familias_afectadas ?? '—'}</div>
+          <div class="col-md-3"><strong>Zona:</strong> ${c.zona || '—'}</div>
+          <div class="col-md-3"><strong>Fuente:</strong> ${c.fuente || '—'}</div>
+        </div>
+        ${c.descripcion ? `<p class="mb-2">${c.descripcion}</p>` : ''}
+        <div class="d-flex gap-2">
+          <a href="/caso/${c.id}/" class="btn btn-sm btn-outline-secondary">Ver detalle completo</a>
+          <button class="btn btn-sm btn-success" onclick="decidirCaso(${c.id}, 'aprobar')">Aprobar</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="decidirCaso(${c.id}, 'rechazar')">Rechazar</button>
+        </div>
+      </div>
+    </div>
   `).join('');
 }
 
-async function decidirRegistro(id, accion) {
+async function decidirCaso(id, accion) {
   let motivo = '';
   if (accion === 'rechazar') {
-    motivo = prompt('¿Por qué se rechaza este registro? (opcional)') || '';
+    motivo = prompt('¿Por qué se rechaza este caso? (opcional)') || '';
   }
   const headers = { 'Content-Type': 'application/json' };
   const csrftoken = obtenerCookie('csrftoken');
   if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
 
-  const resp = await fetch(`/api/registros/${id}/${accion}/`, {
+  const resp = await fetch(`/api/casos/${id}/${accion}/`, {
     method: 'POST',
     headers: headers,
     body: JSON.stringify({ motivo: motivo }),
   });
 
   if (resp.ok) {
-    const fila = document.getElementById(`fila-pendiente-${id}`);
-    if (fila) { fila.remove(); }
+    const tarjeta = document.getElementById(`caso-${id}`);
+    if (tarjeta) { tarjeta.remove(); }
     const badge = document.getElementById('badgeNovedades');
     if (badge) {
       const nuevoTotal = Math.max(0, parseInt(badge.textContent, 10) - 1);
       badge.textContent = nuevoTotal;
       if (nuevoTotal === 0) { badge.style.display = 'none'; }
     }
-    if (document.querySelectorAll('#filasPendientes tr[id^="fila-pendiente-"]').length === 0) {
+    if (document.querySelectorAll('#listaPendientes [id^="caso-"]').length === 0) {
       cargarPendientes();
     }
   } else {

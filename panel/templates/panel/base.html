@@ -70,7 +70,7 @@
     <script>
         // Corre en cualquier página (no solo el tablero) para que el
         // contador de "Novedades" del menú esté siempre al día.
-        fetch('/api/registros/pendientes/')
+        fetch('/api/casos/pendientes/')
             .then(r => r.json())
             .then(data => {
                 const badge = document.getElementById('badgeNovedades');
