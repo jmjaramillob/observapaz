@@ -1,0 +1,146 @@
+{% extends "panel/base.html" %}
+{% block titulo %}Detalle del caso - OBSERVAPAZ{% endblock %}
+
+{% block contenido %}
+<a href="{% url 'panel:tablero' %}" class="btn btn-link ps-0">&larr; Volver al tablero</a>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><strong>{{ caso.tipo_hecho }}</strong> — {{ caso.observatorio.codigo }} {{ caso.observatorio.nombre }}</span>
+    <span id="badgeEstado" class="badge">—</span>
+  </div>
+  <div class="card-body">
+    <div class="row mb-4">
+      <div class="col-md-3"><strong>Fecha del hecho:</strong><br>{{ caso.fecha_hecho }}</div>
+      <div class="col-md-3"><strong>Zona:</strong><br>{{ caso.get_zona_display|default:"—" }}</div>
+      <div class="col-md-3"><strong>Vereda/barrio:</strong><br>{{ caso.vereda_corregimiento_barrio|default:"—" }}</div>
+      <div class="col-md-3"><strong>Nivel de verificación:</strong><br>{{ caso.get_nivel_verificacion_display }}</div>
+    </div>
+
+    <div class="row mb-4">
+      <div class="col-md-6"><strong>Presunto responsable:</strong><br>{{ caso.get_presunto_responsable_display|default:"—" }} {{ caso.presunto_responsable_detalle }}</div>
+      <div class="col-md-6"><strong>Fuente:</strong><br>{{ caso.fuente|default:"—" }}</div>
+    </div>
+
+    <h6 class="text-muted">Población afectada</h6>
+    <div class="row mb-4 text-center">
+      <div class="col"><h5 class="mb-0">{{ caso.num_personas_afectadas|default:"—" }}</h5><small class="text-muted">Total</small></div>
+      <div class="col"><h5 class="mb-0">{{ caso.num_hombres|default:"—" }}</h5><small class="text-muted">Hombres</small></div>
+      <div class="col"><h5 class="mb-0">{{ caso.num_mujeres|default:"—" }}</h5><small class="text-muted">Mujeres</small></div>
+      <div class="col"><h5 class="mb-0">{{ caso.num_ninos_adolescentes|default:"—" }}</h5><small class="text-muted">NNA</small></div>
+      <div class="col"><h5 class="mb-0">{{ caso.num_adultos_mayores|default:"—" }}</h5><small class="text-muted">Adultos mayores</small></div>
+      <div class="col"><h5 class="mb-0">{{ caso.num_familias_afectadas|default:"—" }}</h5><small class="text-muted">Familias</small></div>
+    </div>
+
+    <h6 class="text-muted">Descripción</h6>
+    <p>{{ caso.descripcion|default:"Sin descripción."|linebreaksbr }}</p>
+
+    {% if caso.afectaciones_materiales %}
+    <h6 class="text-muted">Afectaciones materiales</h6>
+    <p>{{ caso.afectaciones_materiales|linebreaksbr }}</p>
+    {% endif %}
+
+    {% if caso.necesidades_identificadas %}
+    <h6 class="text-muted">Necesidades identificadas</h6>
+    <p>{{ caso.necesidades_identificadas|linebreaksbr }}</p>
+    {% endif %}
+
+    {% if caso.archivo_soporte %}
+    <p><strong>Documento de soporte:</strong> <a href="{{ caso.archivo_soporte.url }}" target="_blank">ver archivo</a></p>
+    {% endif %}
+
+    <div class="row mb-3">
+      <div class="col-md-6"><strong>Autorización de registro:</strong> {{ caso.autorizacion_registro|yesno:"Sí,No" }}</div>
+      <div class="col-md-6"><strong>Requiere reserva:</strong> {{ caso.requiere_reserva|yesno:"Sí,No" }}</div>
+    </div>
+    <div class="row mb-3">
+      <div class="col-md-6"><strong>Diligenciado por:</strong> {{ caso.diligencia_nombre|default:"—" }} {{ caso.diligencia_rol }}</div>
+    </div>
+
+    {% if caso.revisado_por %}
+    <div class="alert alert-light border small">
+      Revisado por {{ caso.revisado_por.username }} el {{ caso.revisado_en }}.
+      {% if caso.motivo_rechazo %}<br>Motivo de rechazo: {{ caso.motivo_rechazo }}{% endif %}
+    </div>
+    {% endif %}
+
+    <div id="botonesDecision"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Seguimiento</div>
+  <div class="card-body">
+    <div class="mb-3">
+      <label class="form-label">¿Se remitió a alguna entidad?</label>
+      <input type="text" id="id_remitido_a" class="form-control" value="{{ caso.remitido_a }}" placeholder="Ej: Personería, Defensoría, ICBF, Fiscalía…">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Estado del seguimiento</label>
+      <select id="id_estado_seguimiento" class="form-select">
+        <option value="reportado" {% if caso.estado_seguimiento == "reportado" %}selected{% endif %}>Reportado</option>
+        <option value="en_gestion" {% if caso.estado_seguimiento == "en_gestion" %}selected{% endif %}>En gestión</option>
+        <option value="remitido" {% if caso.estado_seguimiento == "remitido" %}selected{% endif %}>Remitido</option>
+        <option value="cerrado" {% if caso.estado_seguimiento == "cerrado" %}selected{% endif %}>Cerrado</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Observaciones de seguimiento</label>
+      <textarea id="id_observaciones_seguimiento" class="form-control" rows="3">{{ caso.observaciones_seguimiento }}</textarea>
+    </div>
+    <button class="btn btn-primary" id="btnGuardarSeguimiento">Guardar seguimiento</button>
+    <span id="estadoGuardadoSeguimiento" class="text-muted small ms-2"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const casoId = {{ caso.id }};
+const estadoActual = "{{ caso.estado }}";
+
+function obtenerCookie(nombre) {
+  const match = document.cookie.match('(^|;)\\s*' + nombre + '\\s*=\\s*([^;]+)');
+  return match ? match.pop() : '';
+}
+
+const etiquetasEstado = { pendiente: ['Pendiente', 'bg-warning text-dark'], aprobado: ['Aprobado', 'bg-success'], rechazado: ['Rechazado', 'bg-danger'] };
+const badge = document.getElementById('badgeEstado');
+const [texto, clase] = etiquetasEstado[estadoActual] || [estadoActual, 'bg-secondary'];
+badge.textContent = texto;
+badge.className = `badge ${clase}`;
+
+if (estadoActual === 'pendiente') {
+  document.getElementById('botonesDecision').innerHTML = `
+    <button class="btn btn-success" onclick="decidir('aprobar')">Aprobar</button>
+    <button class="btn btn-outline-danger" onclick="decidir('rechazar')">Rechazar</button>
+  `;
+}
+
+async function decidir(accion) {
+  let motivo = '';
+  if (accion === 'rechazar') { motivo = prompt('¿Por qué se rechaza este caso? (opcional)') || ''; }
+  const headers = { 'Content-Type': 'application/json' };
+  const csrftoken = obtenerCookie('csrftoken');
+  if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
+  const resp = await fetch(`/api/casos/${casoId}/${accion}/`, { method: 'POST', headers, body: JSON.stringify({ motivo }) });
+  if (resp.ok) { location.reload(); } else { alert('No se pudo procesar la decisión.'); }
+}
+
+document.getElementById('btnGuardarSeguimiento').addEventListener('click', async () => {
+  const estadoEl = document.getElementById('estadoGuardadoSeguimiento');
+  estadoEl.textContent = 'Guardando…';
+  const formData = new FormData();
+  formData.append('remitido_a', document.getElementById('id_remitido_a').value);
+  formData.append('estado_seguimiento', document.getElementById('id_estado_seguimiento').value);
+  formData.append('observaciones_seguimiento', document.getElementById('id_observaciones_seguimiento').value);
+
+  const headers = {};
+  const csrftoken = obtenerCookie('csrftoken');
+  if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
+
+  const resp = await fetch(`/api/casos/${casoId}/`, { method: 'PATCH', headers, body: formData });
+  estadoEl.textContent = resp.ok ? 'Guardado ✓' : 'No se pudo guardar.';
+});
+</script>
+{% endblock %}

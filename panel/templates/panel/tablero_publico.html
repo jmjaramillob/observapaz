@@ -16,7 +16,7 @@
         Información pública de este observatorio. <a href="#" id="enlaceVerRed">Ver el consolidado de toda la Red</a>.
       </small>
     {% else %}
-      <small class="text-muted">Información pública y agregada de toda la Red.</small>
+      <small class="text-muted">Cifras agregadas y públicas de toda la Red. El detalle de cada caso es confidencial.</small>
     {% endif %}
   </div>
   {% if not user.is_authenticated %}
@@ -33,14 +33,14 @@
   </div>
   <div class="col-md-4">
     <div class="card text-center h-100"><div class="card-body">
-      <h6 class="text-muted small text-uppercase">Indicadores</h6>
-      <h2 class="mb-0" id="totalIndicadores">—</h2>
+      <h6 class="text-muted small text-uppercase">Casos registrados</h6>
+      <h2 class="mb-0" id="totalCasos">—</h2>
     </div></div>
   </div>
   <div class="col-md-4">
     <div class="card text-center h-100"><div class="card-body">
-      <h6 class="text-muted small text-uppercase">Registros capturados</h6>
-      <h2 class="mb-0" id="totalRegistros">—</h2>
+      <h6 class="text-muted small text-uppercase">Personas afectadas</h6>
+      <h2 class="mb-0" id="totalPersonas">—</h2>
     </div></div>
   </div>
 </div>
@@ -48,37 +48,33 @@
 <div class="row g-3 mb-4">
   <div class="col-lg-8">
     <div class="card h-100">
-      <div class="card-header">Registros por observatorio</div>
+      <div class="card-header">Casos por observatorio</div>
       <div class="card-body"><canvas id="gObservatorios" height="120"></canvas></div>
     </div>
   </div>
   <div class="col-lg-4">
     <div class="card h-100">
-      <div class="card-header">Distribución por categoría</div>
-      <div class="card-body"><canvas id="gCategorias" height="200"></canvas></div>
+      <div class="card-header">Casos por tipo de hecho</div>
+      <div class="card-body"><canvas id="gTipoHecho" height="200"></canvas></div>
     </div>
   </div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Evolución mensual de registros</div>
+  <div class="card-header">Evolución mensual de casos</div>
   <div class="card-body"><canvas id="gMeses" height="80"></canvas></div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Resumen de indicadores</div>
-  <div class="table-responsive">
-    <table class="table table-striped mb-0 align-middle">
-      <thead class="table-light">
-        <tr><th>Observatorio</th><th>Indicador</th><th>Categoría</th><th>Último valor</th><th>Meta</th></tr>
-      </thead>
-      <tbody id="filasIndicadores">
-        <tr><td colspan="5" class="text-center text-muted py-4">Cargando…</td></tr>
-      </tbody>
-    </table>
+  <div class="card-header">Población afectada (acumulado)</div>
+  <div class="card-body">
+    <div class="row text-center g-3" id="filasPoblacion">
+      <div class="col text-muted">Cargando…</div>
+    </div>
   </div>
   <div class="card-footer text-muted small">
-    Este resumen es público. El detalle completo de cada registro (fuente, observaciones, ubicación) solo es visible para el equipo de cada observatorio, previo inicio de sesión.
+    Estas cifras son agregadas y públicas. El detalle de cada caso (descripción, fuente, ubicación)
+    solo es visible para el equipo de cada observatorio, previo inicio de sesión.
   </div>
 </div>
 {% endblock %}
@@ -98,10 +94,10 @@ function dibujarChart(id, tipo, labels, data, opciones) {
   if (tipo === 'doughnut') {
     dataset = { data: data, backgroundColor: paleta };
   } else if (tipo === 'line') {
-    dataset = { label: 'Registros', data: data, borderColor: '#198754',
+    dataset = { label: 'Casos', data: data, borderColor: '#198754',
                 backgroundColor: 'rgba(25,135,84,.1)', fill: true, tension: 0.3 };
   } else {
-    dataset = { label: 'Registros', data: data, backgroundColor: '#0d6efd' };
+    dataset = { label: 'Casos', data: data, backgroundColor: '#0d6efd' };
   }
   new Chart(document.getElementById(id), {
     type: tipo,
@@ -111,38 +107,28 @@ function dibujarChart(id, tipo, labels, data, opciones) {
 }
 
 async function cargarTableroPublico() {
-  const params = obsSubdominio ? `?indicador__observatorio=${obsSubdominio}` : '';
-  const paramsIndicadores = obsSubdominio ? `?observatorio=${obsSubdominio}` : '';
-  const [resumen, indicadores] = await Promise.all([
-    fetch(`/api/registros/resumen/${params}`).then(r => r.json()),
-    fetch(`/api/indicadores/resumen/${paramsIndicadores}`).then(r => r.json()),
-  ]);
+  const params = obsSubdominio ? `?observatorio=${obsSubdominio}` : '';
+  const resumen = await fetch(`/api/casos/resumen/${params}`).then(r => r.json());
 
   document.getElementById('totalObservatorios').textContent = resumen.total_observatorios;
-  document.getElementById('totalIndicadores').textContent = resumen.total_indicadores;
-  document.getElementById('totalRegistros').textContent = resumen.total_registros;
+  document.getElementById('totalCasos').textContent = resumen.total_casos;
+  document.getElementById('totalPersonas').textContent = resumen.poblacion.personas;
 
   dibujarChart('gObservatorios', 'bar', resumen.por_observatorio.labels, resumen.por_observatorio.data,
     { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
-  dibujarChart('gCategorias', 'doughnut', resumen.por_categoria.labels, resumen.por_categoria.data,
+  dibujarChart('gTipoHecho', 'doughnut', resumen.por_tipo_hecho.labels, resumen.por_tipo_hecho.data,
     { responsive: true, plugins: { legend: { position: 'bottom' } } });
   dibujarChart('gMeses', 'line', resumen.por_mes.labels, resumen.por_mes.data,
     { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
 
-  const filas = document.getElementById('filasIndicadores');
-  if (indicadores.length === 0) {
-    filas.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Aún no hay indicadores registrados.</td></tr>';
-    return;
-  }
-  filas.innerHTML = indicadores.map(ind => `
-    <tr>
-      <td><span class="badge bg-secondary">${ind.observatorio_codigo}</span></td>
-      <td>${ind.nombre}</td>
-      <td>${ind.categoria_nombre || '—'}</td>
-      <td>${ind.ultimo_valor ?? '—'} ${ind.unidad || ''}</td>
-      <td>${ind.meta ?? '—'}</td>
-    </tr>
-  `).join('');
+  const p = resumen.poblacion;
+  document.getElementById('filasPoblacion').innerHTML = `
+    <div class="col-6 col-md-2"><h4 class="mb-0">${p.hombres}</h4><small class="text-muted">Hombres</small></div>
+    <div class="col-6 col-md-2"><h4 class="mb-0">${p.mujeres}</h4><small class="text-muted">Mujeres</small></div>
+    <div class="col-6 col-md-2"><h4 class="mb-0">${p.ninos_adolescentes}</h4><small class="text-muted">NNA</small></div>
+    <div class="col-6 col-md-2"><h4 class="mb-0">${p.adultos_mayores}</h4><small class="text-muted">Adultos mayores</small></div>
+    <div class="col-6 col-md-2"><h4 class="mb-0">${p.familias}</h4><small class="text-muted">Familias</small></div>
+  `;
 }
 cargarTableroPublico();
 </script>

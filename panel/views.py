@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
-from core.models import Indicador, Observatorio
+from core.models import CasoVictimizante, Observatorio
 from core.utils import observatorio_del_usuario
 
 
@@ -27,10 +27,9 @@ def lista_formularios(request):
 
 def formulario_publico(request, codigo=None):
     """
-    Muestra el formulario de captura. El HTML solo sirve de "cascarón":
-    la lista de indicadores se carga con JavaScript desde
-    GET /api/indicadores/, y el envío se hace con POST /api/registros/
-    -Django ya no procesa el formulario aquí-.
+    Muestra el formulario de reporte de casos. El HTML solo sirve de
+    "cascarón": el envío se hace con JavaScript vía
+    POST /api/casos/ -Django ya no procesa el formulario aquí-.
 
     El observatorio se resuelve así, en orden: el código explícito en
     la URL (/formulario/OBS-007/) si alguien lo visita directamente;
@@ -59,10 +58,10 @@ def formulario_publico(request, codigo=None):
 
 def tablero_publico(request):
     """
-    Tablero consolidado PÚBLICO (sin login). Cifras agregadas, vía API.
-    Desde el subdominio de un observatorio muestra sus propias cifras
-    por defecto (con un enlace para ver el consolidado de toda la Red);
-    desde el dominio raíz, muestra la Red completa.
+    Tablero consolidado PÚBLICO (sin login). Cifras agregadas de casos,
+    vía API. Desde el subdominio de un observatorio muestra sus propias
+    cifras por defecto (con un enlace para ver el consolidado de toda
+    la Red); desde el dominio raíz, muestra la Red completa.
     """
     contexto = {"obs_subdominio": request.observatorio, "dominio_base": settings.DOMINIO_BASE}
     return render(request, "panel/tablero_publico.html", contexto)
@@ -97,32 +96,29 @@ def tablero(request):
 @login_required
 def novedades(request):
     """
-    Bandeja de novedades pendientes: la página dedicada a revisarlas y
-    decidir si son válidas (a diferencia del tablero, que solo muestra
-    un resumen con el enlace hacia aquí).
+    Bandeja de casos pendientes de revisión: la página dedicada a
+    revisarlos y decidir si son válidos (a diferencia del tablero, que
+    solo muestra un resumen con el enlace hacia aquí).
     """
     return render(request, "panel/novedades.html")
 
 
 @login_required
-def detalle_indicador(request, indicador_id):
+def detalle_caso(request, caso_id):
     """
-    Tablero individual de un indicador. Django sigue siendo quien
-    decide si el usuario puede ENTRAR a esta página (404 si el
-    indicador es de otro observatorio) -eso no se puede dejar solo en
-    manos de JavaScript, que cualquiera podría manipular-. Una vez
-    dentro, el historial de valores se trae con fetch() a la API,
-    que vuelve a validar el mismo acceso de forma independiente.
+    Detalle completo de un caso. Django sigue siendo quien decide si
+    el usuario puede ENTRAR a esta página (404 si el caso es de otro
+    observatorio) -eso no se puede dejar solo en manos de JavaScript,
+    que cualquiera podría manipular-. Una vez dentro, el detalle se
+    trae con fetch() a la API, que vuelve a validar el mismo acceso de
+    forma independiente.
     """
     obs_usuario = observatorio_del_usuario(request.user)
 
-    qs = Indicador.objects.select_related("observatorio", "categoria")
+    qs = CasoVictimizante.objects.select_related("observatorio", "tipo_hecho")
     if obs_usuario:
         qs = qs.filter(observatorio=obs_usuario)
 
-    indicador = get_object_or_404(qs, pk=indicador_id)
+    caso = get_object_or_404(qs, pk=caso_id)
 
-    contexto = {
-        "indicador": indicador,
-    }
-    return render(request, "panel/detalle_indicador.html", contexto)
+    return render(request, "panel/detalle_caso.html", {"caso": caso})

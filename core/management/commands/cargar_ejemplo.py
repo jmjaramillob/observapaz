@@ -3,31 +3,37 @@ from datetime import date, timedelta
 
 from django.core.management.base import BaseCommand
 
-from core.models import CategoriaIndicador, Indicador, Observatorio, RegistroIndicador
+from core.models import CasoVictimizante, Observatorio, TipoHecho
 
 
 class Command(BaseCommand):
-    help = "Carga datos de ejemplo: 24 observatorios, categorías, indicadores y registros."
+    help = "Carga datos de ejemplo: 24 observatorios, catálogo de tipos de hecho, y casos aprobados."
 
     def handle(self, *args, **options):
-        categorias_nombres = [
-            "Seguridad y convivencia",
-            "Derechos humanos",
-            "Participación comunitaria",
-            "Desarrollo territorial",
-            "Reincorporación",
+        tipos_nombres = [
+            "Desplazamiento forzado",
+            "Homicidio",
+            "Amenaza",
+            "Desaparición forzada",
+            "Secuestro",
+            "Tortura",
+            "Delitos contra la libertad e integridad sexual",
+            "Reclutamiento, uso o utilización de niños, niñas y adolescentes",
+            "Minas antipersonal / munición sin explotar (MAP/MUSE)",
+            "Confinamiento",
+            "Despojo o abandono forzado de tierras",
+            "Actos terroristas / atentados / combates",
+            "Extorsión",
+            "Otro",
         ]
-        categorias = []
-        for nombre in categorias_nombres:
-            cat, _ = CategoriaIndicador.objects.get_or_create(nombre=nombre)
-            categorias.append(cat)
+        tipos = []
+        for i, nombre in enumerate(tipos_nombres):
+            tipo, _ = TipoHecho.objects.get_or_create(nombre=nombre, defaults={"orden": i})
+            tipos.append(tipo)
 
-        indicadores_base = [
-            ("Casos atendidos", "casos"),
-            ("Personas participantes", "personas"),
-            ("Jornadas realizadas", "jornadas"),
-            ("Cobertura territorial", "%"),
-        ]
+        zonas = [z for z, _ in CasoVictimizante.Zona.choices]
+        responsables = [r for r, _ in CasoVictimizante.PresuntoResponsable.choices]
+        verificaciones = [v for v, _ in CasoVictimizante.NivelVerificacion.choices]
 
         creados = 0
         for i in range(1, 25):
@@ -43,43 +49,42 @@ class Command(BaseCommand):
                 },
             )
 
-            for nombre, unidad in random.sample(indicadores_base, k=random.randint(2, 4)):
-                ind, _ = Indicador.objects.get_or_create(
-                    observatorio=obs,
-                    nombre=nombre,
-                    defaults={
-                        "categoria": random.choice(categorias),
-                        "unidad": unidad,
-                        "meta": random.choice([50, 100, 200, None]),
-                        "activo": True,
-                    },
-                )
+            if obs.casos.exists():
+                continue
 
-                if ind.registros.exists():
-                    continue
-
-                hoy = date.today()
-                for mes in range(8, 0, -1):
-                    fecha = hoy - timedelta(days=mes * 30)
-                    RegistroIndicador.objects.create(
-                        indicador=ind,
-                        fecha=fecha,
-                        valor=round(random.uniform(10, 180), 1),
+            hoy = date.today()
+            for mes in range(8, 0, -1):
+                for _ in range(random.randint(1, 3)):
+                    fecha = hoy - timedelta(days=mes * 30 + random.randint(0, 25))
+                    personas = random.randint(1, 40)
+                    CasoVictimizante.objects.create(
+                        observatorio=obs,
+                        fecha_hecho=fecha,
+                        zona=random.choice(zonas),
+                        tipo_hecho=random.choice(tipos),
+                        presunto_responsable=random.choice(responsables),
+                        num_personas_afectadas=personas,
+                        num_hombres=personas // 2,
+                        num_mujeres=personas - (personas // 2),
+                        num_familias_afectadas=max(1, personas // 4),
                         fuente=random.choice(
-                            ["Visita de campo", "Acta comunitaria", "Reporte ODK", "Mesa técnica"]
+                            ["Visita de campo", "Acta comunitaria", "Reporte ODK", "Autoridad local"]
                         ),
-                        # Datos de ejemplo: se crean ya aprobados, para que
-                        # se vean de una vez en los tableros. Los registros
-                        # que lleguen por el formulario público sí quedan
-                        # pendientes de revisión (comportamiento normal).
-                        estado=RegistroIndicador.EstadoRegistro.APROBADO,
+                        nivel_verificacion=random.choice(verificaciones),
+                        descripcion="Caso de ejemplo generado automáticamente.",
+                        autorizacion_registro=True,
+                        # Datos de ejemplo: se crean ya aprobados, para que se
+                        # vean de una vez en los tableros. Los casos que
+                        # lleguen por el formulario público o por ODK sí
+                        # quedan pendientes de revisión (comportamiento normal).
+                        estado=CasoVictimizante.EstadoRevision.APROBADO,
                     )
                     creados += 1
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"Listo: {Observatorio.objects.count()} observatorios, "
-                f"{Indicador.objects.count()} indicadores, "
-                f"{RegistroIndicador.objects.count()} registros ({creados} nuevos)."
+                f"{TipoHecho.objects.count()} tipos de hecho, "
+                f"{CasoVictimizante.objects.count()} casos ({creados} nuevos)."
             )
         )
