@@ -93,11 +93,11 @@
       <thead class="table-light">
         <tr>
           <th>Observatorio</th><th>Tipo de hecho</th><th>Fecha del hecho</th>
-          <th>Personas afectadas</th><th>Verificación</th><th>Estado</th><th></th>
+          <th>Personas afectadas</th><th>Verificación</th><th>Estado</th><th></th><th></th>
         </tr>
       </thead>
       <tbody id="filasCasos">
-        <tr><td colspan="7" class="text-center text-muted py-4">Cargando…</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">Cargando…</td></tr>
       </tbody>
     </table>
   </div>
@@ -169,7 +169,7 @@ async function cargarTablero(observatorioId) {
 
   const filas = document.getElementById('filasCasos');
   if (casos.length === 0) {
-    filas.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Aún no hay casos registrados.</td></tr>';
+    filas.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Aún no hay casos registrados.</td></tr>';
     return;
   }
   casos.sort((a, b) => (b.fecha_hecho || '').localeCompare(a.fecha_hecho || ''));
@@ -182,6 +182,7 @@ async function cargarTablero(observatorioId) {
       <td>${etiquetasVerificacion[c.nivel_verificacion] || '—'}</td>
       <td><span class="badge ${c.estado === 'aprobado' ? 'bg-success' : c.estado === 'rechazado' ? 'bg-danger' : 'bg-warning text-dark'}">${etiquetasEstado[c.estado] || c.estado}</span></td>
       <td><a href="/caso/${c.id}/" class="btn btn-sm btn-outline-primary">Ver detalle</a></td>
+      <td><a href="/api/casos/${c.id}/reporte/" class="btn btn-sm btn-outline-secondary" title="Descargar reporte en PDF" target="_blank">Reporte PDF</a></td>
     </tr>
   `).join('');
 }

@@ -120,6 +120,14 @@ REST_FRAMEWORK = {
         # heredar un acceso amplio por accidente.
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # Límite de envíos anónimos del formulario público de casos, para que
+    # no se pueda inundar la bandeja de "pendientes" con envíos masivos.
+    # Solo se aplica a la creación de casos sin sesión iniciada (ver
+    # CasoVictimizanteViewSet.get_throttles); no afecta lecturas ni a
+    # usuarios ya logueados.
+    "DEFAULT_THROTTLE_RATES": {
+        "envio_caso": os.environ.get("THROTTLE_ENVIO_CASO", "20/hour"),
+    },
 }
 
 LOGIN_URL = "panel:login"
@@ -164,3 +172,37 @@ _cookie_domain = os.environ.get("COOKIE_DOMINIO_COMPARTIDO", "")
 if _cookie_domain:
     SESSION_COOKIE_DOMAIN = _cookie_domain
     CSRF_COOKIE_DOMAIN = _cookie_domain
+
+# --- Endurecimiento de seguridad para producción con subdominios ---
+#
+# CSRF_TRUSTED_ORIGINS: obligatorio en Django 4+ para aceptar POST desde
+# un origen distinto al que sirvió el formulario. Con 24 subdominios en
+# juego, se define con comodín. Vacío por defecto -no cambia nada en
+# desarrollo local-; en producción, en el .env:
+#   CSRF_TRUSTED_ORIGINS=https://observapaz.org,https://*.observapaz.org
+_csrf_trusted = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
+if _csrf_trusted:
+    CSRF_TRUSTED_ORIGINS = [origen.strip() for origen in _csrf_trusted.split(",") if origen.strip()]
+
+# El servidor Django corre detrás de Nginx, que es quien de verdad habla
+# HTTPS con el navegador y le pasa la petición a Gunicorn por HTTP simple.
+# Esta línea le permite a Django reconocer, por la cabecera que reenvía
+# Nginx, que la conexión original sí era HTTPS -sin ella, activar
+# SECURE_SSL_REDIRECT provocaría un bucle infinito de redirecciones-.
+# Es inofensiva por sí sola: no hace nada mientras Nginx no envíe esa
+# cabecera y mientras las variables de abajo sigan en su valor por
+# defecto (desactivadas).
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Todo esto queda APAGADO por defecto a propósito, para no romper nada de
+# lo que ya funciona (incluye el desarrollo local sin HTTPS). Se activa
+# solo si lo pides explícitamente en el .env, y únicamente después de
+# confirmar que Nginx ya está mandando "proxy_set_header X-Forwarded-Proto
+# $scheme;" -si se activa sin eso, el sitio queda en un bucle de
+# redirecciones-.
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "False") == "True"
+SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False") == "True"
+CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "False") == "True"
+SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
