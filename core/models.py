@@ -1,5 +1,25 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
+
+EXTENSIONES_SOPORTE_PERMITIDAS = ["pdf", "jpg", "jpeg", "png", "doc", "docx"]
+TAMANO_MAXIMO_SOPORTE_MB = 10
+
+
+def validar_tamano_archivo_soporte(archivo):
+    """
+    Límite de tamaño para el archivo de soporte adjunto a un caso.
+    Se suma a FileExtensionValidator (que ya restringe el tipo de
+    archivo) para que el formulario público -abierto a cualquiera, sin
+    sesión iniciada- no pueda usarse para subir archivos pesados o de
+    un tipo inesperado.
+    """
+    limite_bytes = TAMANO_MAXIMO_SOPORTE_MB * 1024 * 1024
+    if archivo.size > limite_bytes:
+        raise ValidationError(
+            f"El archivo no puede superar los {TAMANO_MAXIMO_SOPORTE_MB} MB."
+        )
 
 
 class Observatorio(models.Model):
@@ -157,7 +177,12 @@ class CasoVictimizante(models.Model):
         default=NivelVerificacion.NO_VERIFICADO,
     )
     archivo_soporte = models.FileField(
-        upload_to=_ruta_soporte_caso, blank=True, null=True
+        upload_to=_ruta_soporte_caso, blank=True, null=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=EXTENSIONES_SOPORTE_PERMITIDAS),
+            validar_tamano_archivo_soporte,
+        ],
+        help_text="PDF, imagen o documento de Word, máximo 10 MB.",
     )
 
     # --- Descripción e impacto ---

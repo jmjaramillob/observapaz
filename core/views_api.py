@@ -1,5 +1,6 @@
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -7,12 +8,14 @@ from rest_framework.response import Response
 
 from .models import CasoVictimizante, EnvioODK, Observatorio, TipoHecho
 from .permissions import CasoVictimizantePermiso, SoloAutenticadoPermiso, SoloLecturaPublicaPermiso
+from .reportes import generar_pdf_caso
 from .serializers import (
     CasoVictimizanteSerializer,
     EnvioODKSerializer,
     ObservatorioSerializer,
     TipoHechoSerializer,
 )
+from .throttling import EnvioCasoThrottle
 from .utils import observatorio_del_usuario
 
 
@@ -35,6 +38,17 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
     serializer_class = CasoVictimizanteSerializer
     permission_classes = [CasoVictimizantePermiso]
     filterset_fields = ["observatorio", "tipo_hecho", "estado", "fecha_hecho"]
+
+    def get_throttles(self):
+        """
+        El límite de envíos (EnvioCasoThrottle) solo aplica al crear un
+        caso sin sesión iniciada -el formulario público-. El resto de
+        acciones (listar, resumen, pendientes, aprobar, rechazar, o
+        crear ya logueado) sigue sin ningún límite adicional.
+        """
+        if self.action == "create" and not self.request.user.is_authenticated:
+            return [EnvioCasoThrottle()]
+        return super().get_throttles()
 
     def get_queryset(self):
         """
@@ -136,6 +150,22 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
         caso.motivo_rechazo = ""
         caso.save()
         return Response(self.get_serializer(caso).data)
+
+    @action(detail=True, methods=["get"])
+    def reporte(self, request, pk=None):
+        """
+        Reporte PDF de este caso, con el mismo encabezado institucional
+        del sitio y todos los campos de la página de detalle. Requiere
+        sesión iniciada -self.get_object() ya respeta el aislamiento por
+        observatorio de get_queryset(), así que un gestor no puede
+        descargar el reporte de un caso ajeno-.
+        """
+        caso = self.get_object()
+        pdf = generar_pdf_caso(caso)
+        nombre_archivo = f"reporte_caso_{caso.id}.pdf"
+        respuesta = HttpResponse(pdf, content_type="application/pdf")
+        respuesta["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+        return respuesta
 
     @action(detail=True, methods=["post"])
     def rechazar(self, request, pk=None):
