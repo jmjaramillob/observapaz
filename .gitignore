@@ -1,0 +1,39 @@
+# --- Variables de entorno: cada entorno (local, servidor) tiene las suyas ---
+.env
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.Python
+venv/
+.venv/
+env/
+
+# --- Django ---
+# Archivos estáticos recolectados por collectstatic (se generan en el
+# servidor, no tienen por qué versionarse).
+/staticfiles/
+# Archivos subidos por los usuarios (documentos de soporte de los casos,
+# etc.) -nunca deben ir al repositorio, menos siendo información sensible.
+/media/
+
+# --- Formularios ODK generados automáticamente (comando generar_xlsform) ---
+/xlsforms/
+
+# --- Docker / base de datos local ---
+# (el volumen real de Postgres vive dentro de Docker, no en esta carpeta,
+# pero por si alguna vez se monta algo local de prueba)
+*.sqlite3
+pgdata/
+
+# --- Editor / sistema operativo ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Node (si se usa alguna herramienta de frontend en el futuro) ---
+node_modules/
