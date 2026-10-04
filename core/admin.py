@@ -5,6 +5,13 @@ from django.utils import timezone
 
 from .models import CasoVictimizante, EnvioODK, Observatorio, PerfilUsuario, TipoHecho
 
+# Texto genérico del panel de administración: por defecto Django muestra
+# "Django administration" en el título de la pestaña y en el encabezado.
+# Se reemplaza aquí para no exponer la tecnología usada por el sitio.
+admin.site.site_header = "Administración — OBSERVAPAZ"
+admin.site.site_title = "Administración OBSERVAPAZ"
+admin.site.index_title = "Panel de administración"
+
 
 @admin.register(Observatorio)
 class ObservatorioAdmin(admin.ModelAdmin):
