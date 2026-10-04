@@ -24,24 +24,30 @@
   {% endif %}
 </div>
 
-<div class="row g-3 mb-4">
-  <div class="col-md-4">
-    <div class="card text-center h-100"><div class="card-body">
-      <h6 class="text-muted small text-uppercase">Observatorios activos</h6>
-      <h2 class="mb-0" id="totalObservatorios">—</h2>
-    </div></div>
+<div class="indicadores mb-4">
+  <div class="indicador">
+    <span class="indicador__icono">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+    </span>
+    <span class="indicador__etiqueta">Observatorios activos</span>
+    <span class="indicador__valor" id="totalObservatorios">—</span>
+    <span class="indicador__nota">En toda la Red</span>
   </div>
-  <div class="col-md-4">
-    <div class="card text-center h-100"><div class="card-body">
-      <h6 class="text-muted small text-uppercase">Casos registrados</h6>
-      <h2 class="mb-0" id="totalCasos">—</h2>
-    </div></div>
+  <div class="indicador">
+    <span class="indicador__icono">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="16" y2="15"/></svg>
+    </span>
+    <span class="indicador__etiqueta">Casos registrados</span>
+    <span class="indicador__valor" id="totalCasos">—</span>
+    <span class="indicador__nota">Cifra acumulada</span>
   </div>
-  <div class="col-md-4">
-    <div class="card text-center h-100"><div class="card-body">
-      <h6 class="text-muted small text-uppercase">Personas afectadas</h6>
-      <h2 class="mb-0" id="totalPersonas">—</h2>
-    </div></div>
+  <div class="indicador">
+    <span class="indicador__icono">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M19 20v-1.5a3.3 3.3 0 0 0-2.2-3.1"/><path d="M14.3 4.2a3.5 3.5 0 0 1 0 6.6"/></svg>
+    </span>
+    <span class="indicador__etiqueta">Personas afectadas</span>
+    <span class="indicador__valor" id="totalPersonas">—</span>
+    <span class="indicador__nota">Cifra acumulada</span>
   </div>
 </div>
 
