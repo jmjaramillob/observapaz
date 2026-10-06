@@ -8,9 +8,9 @@
       <div class="card-header bg-primary text-white">
         <h5 class="mb-0">Reportar un caso</h5>
         {% if observatorio %}
-          <small>{{ observatorio.codigo }} — {{ observatorio.nombre }}</small>
+        <small>{{ observatorio.codigo }} — {{ observatorio.nombre }}</small>
         {% else %}
-          <small>Red de Observatorios para la Paz Territorial</small>
+        <small>Red de Observatorios</small>
         {% endif %}
       </div>
       <div class="card-body">
@@ -123,7 +123,8 @@
           <div class="row">
             <div class="col-md-6 mb-3">
               <label for="id_fuente" class="form-label">Fuente de la información</label>
-              <input type="text" id="id_fuente" class="form-control" placeholder="Ej: comunidad, autoridad local, medios">
+              <input type="text" id="id_fuente" class="form-control"
+                placeholder="Ej: comunidad, autoridad local, medios">
             </div>
             <div class="col-md-6 mb-3">
               <label for="id_verificacion" class="form-label">Nivel de verificación</label>
@@ -142,7 +143,8 @@
           <h6 class="text-muted mt-4">Descripción</h6>
           <div class="mb-3">
             <label for="id_descripcion" class="form-label">Descripción del hecho</label>
-            <textarea id="id_descripcion" class="form-control" rows="3" placeholder="Sin nombres ni datos que identifiquen a víctimas"></textarea>
+            <textarea id="id_descripcion" class="form-control" rows="3"
+              placeholder="Sin nombres ni datos que identifiquen a víctimas"></textarea>
           </div>
           <div class="mb-3">
             <label for="id_afectaciones" class="form-label">Afectaciones materiales</label>
@@ -187,110 +189,110 @@
 
 {% block scripts %}
 <script>
-async function obtenerTodasPaginas(url) {
-  let resultados = [];
-  while (url) {
-    const resp = await fetch(url);
-    const data = await resp.json();
-    if (Array.isArray(data)) { resultados = resultados.concat(data); url = null; }
-    else { resultados = resultados.concat(data.results || []); url = data.next; }
-  }
-  return resultados;
-}
-
-function obtenerCookie(nombre) {
-  const match = document.cookie.match('(^|;)\\s*' + nombre + '\\s*=\\s*([^;]+)');
-  return match ? match.pop() : '';
-}
-
-let observatorioId = {% if observatorio %}{{ observatorio.id }}{% else %}null{% endif %};
-
-async function cargarObservatorios() {
-  const select = document.getElementById('id_observatorio');
-  if (!select) return;
-  const observatorios = await obtenerTodasPaginas('/api/observatorios/?activo=true');
-  select.innerHTML = '<option value="">Selecciona un observatorio…</option>';
-  observatorios.forEach(obs => {
-    const opt = document.createElement('option');
-    opt.value = obs.id;
-    opt.textContent = `${obs.codigo} - ${obs.nombre}`;
-    select.appendChild(opt);
-  });
-  select.addEventListener('change', () => { observatorioId = select.value; });
-}
-
-async function cargarTiposHecho() {
-  const select = document.getElementById('id_tipo_hecho');
-  const tipos = await obtenerTodasPaginas('/api/tipos-hecho/?activo=true');
-  select.innerHTML = '<option value="">Selecciona un tipo de hecho…</option>';
-  tipos.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    opt.textContent = t.nombre;
-    select.appendChild(opt);
-  });
-}
-
-cargarObservatorios();
-cargarTiposHecho();
-
-document.getElementById('formCaso').addEventListener('submit', async function (e) {
-  e.preventDefault();
-  const boton = document.getElementById('btnEnviar');
-  const alerta = document.getElementById('alertaEnvio');
-  boton.disabled = true;
-  boton.textContent = 'Enviando…';
-
-  const formData = new FormData();
-  formData.append('observatorio', observatorioId || '');
-  formData.append('fecha_hecho', document.getElementById('id_fecha_hecho').value);
-  formData.append('zona', document.getElementById('id_zona').value);
-  formData.append('vereda_corregimiento_barrio', document.getElementById('id_vereda').value);
-  formData.append('tipo_hecho', document.getElementById('id_tipo_hecho').value);
-  formData.append('tipo_hecho_otro', document.getElementById('id_tipo_hecho_otro').value);
-  formData.append('presunto_responsable', document.getElementById('id_responsable').value);
-  formData.append('presunto_responsable_detalle', document.getElementById('id_responsable_detalle').value);
-  formData.append('num_personas_afectadas', document.getElementById('id_num_personas').value);
-  formData.append('num_hombres', document.getElementById('id_num_hombres').value);
-  formData.append('num_mujeres', document.getElementById('id_num_mujeres').value);
-  formData.append('num_otro_genero', document.getElementById('id_num_otro_genero').value);
-  formData.append('num_ninos_adolescentes', document.getElementById('id_num_ninos').value);
-  formData.append('num_adultos', document.getElementById('id_num_adultos').value);
-  formData.append('num_adultos_mayores', document.getElementById('id_num_adultos_mayores').value);
-  formData.append('num_familias_afectadas', document.getElementById('id_num_familias').value);
-  formData.append('fuente', document.getElementById('id_fuente').value);
-  formData.append('nivel_verificacion', document.getElementById('id_verificacion').value);
-  formData.append('descripcion', document.getElementById('id_descripcion').value);
-  formData.append('afectaciones_materiales', document.getElementById('id_afectaciones').value);
-  formData.append('necesidades_identificadas', document.getElementById('id_necesidades').value);
-  formData.append('autorizacion_registro', document.getElementById('id_autorizacion').checked);
-  formData.append('requiere_reserva', document.getElementById('id_reserva').checked);
-  formData.append('diligencia_nombre', document.getElementById('id_diligencia_nombre').value);
-  formData.append('diligencia_rol', document.getElementById('id_diligencia_rol').value);
-  const archivo = document.getElementById('id_archivo').files[0];
-  if (archivo) { formData.append('archivo_soporte', archivo); }
-
-  const headers = {};
-  const csrftoken = obtenerCookie('csrftoken');
-  if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
-
-  try {
-    const resp = await fetch('/api/casos/', { method: 'POST', headers: headers, body: formData });
-
-    if (resp.ok) {
-      alerta.innerHTML = '<div class="alert alert-success">¡Gracias! El reporte se guardó correctamente y quedó pendiente de revisión.</div>';
-      document.getElementById('formCaso').reset();
-    } else {
-      const errores = await resp.json();
-      const detalle = Object.entries(errores).map(([campo, msgs]) => `${campo}: ${Array.isArray(msgs) ? msgs.join(' ') : msgs}`).join('<br>');
-      alerta.innerHTML = `<div class="alert alert-danger">No se pudo guardar el reporte:<br>${detalle}</div>`;
+  async function obtenerTodasPaginas(url) {
+    let resultados = [];
+    while (url) {
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (Array.isArray(data)) { resultados = resultados.concat(data); url = null; }
+      else { resultados = resultados.concat(data.results || []); url = data.next; }
     }
-  } catch (e) {
-    alerta.innerHTML = '<div class="alert alert-danger">Error de conexión. Intenta de nuevo.</div>';
-  } finally {
-    boton.disabled = false;
-    boton.textContent = 'Enviar reporte';
+    return resultados;
   }
-});
+
+  function obtenerCookie(nombre) {
+    const match = document.cookie.match('(^|;)\\s*' + nombre + '\\s*=\\s*([^;]+)');
+    return match ? match.pop() : '';
+  }
+
+  let observatorioId = {% if observatorio %}{ { observatorio.id } } {% else %} null{% endif %};
+
+  async function cargarObservatorios() {
+    const select = document.getElementById('id_observatorio');
+    if (!select) return;
+    const observatorios = await obtenerTodasPaginas('/api/observatorios/?activo=true');
+    select.innerHTML = '<option value="">Selecciona un observatorio…</option>';
+    observatorios.forEach(obs => {
+      const opt = document.createElement('option');
+      opt.value = obs.id;
+      opt.textContent = `${obs.codigo} - ${obs.nombre}`;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', () => { observatorioId = select.value; });
+  }
+
+  async function cargarTiposHecho() {
+    const select = document.getElementById('id_tipo_hecho');
+    const tipos = await obtenerTodasPaginas('/api/tipos-hecho/?activo=true');
+    select.innerHTML = '<option value="">Selecciona un tipo de hecho…</option>';
+    tipos.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.nombre;
+      select.appendChild(opt);
+    });
+  }
+
+  cargarObservatorios();
+  cargarTiposHecho();
+
+  document.getElementById('formCaso').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const boton = document.getElementById('btnEnviar');
+    const alerta = document.getElementById('alertaEnvio');
+    boton.disabled = true;
+    boton.textContent = 'Enviando…';
+
+    const formData = new FormData();
+    formData.append('observatorio', observatorioId || '');
+    formData.append('fecha_hecho', document.getElementById('id_fecha_hecho').value);
+    formData.append('zona', document.getElementById('id_zona').value);
+    formData.append('vereda_corregimiento_barrio', document.getElementById('id_vereda').value);
+    formData.append('tipo_hecho', document.getElementById('id_tipo_hecho').value);
+    formData.append('tipo_hecho_otro', document.getElementById('id_tipo_hecho_otro').value);
+    formData.append('presunto_responsable', document.getElementById('id_responsable').value);
+    formData.append('presunto_responsable_detalle', document.getElementById('id_responsable_detalle').value);
+    formData.append('num_personas_afectadas', document.getElementById('id_num_personas').value);
+    formData.append('num_hombres', document.getElementById('id_num_hombres').value);
+    formData.append('num_mujeres', document.getElementById('id_num_mujeres').value);
+    formData.append('num_otro_genero', document.getElementById('id_num_otro_genero').value);
+    formData.append('num_ninos_adolescentes', document.getElementById('id_num_ninos').value);
+    formData.append('num_adultos', document.getElementById('id_num_adultos').value);
+    formData.append('num_adultos_mayores', document.getElementById('id_num_adultos_mayores').value);
+    formData.append('num_familias_afectadas', document.getElementById('id_num_familias').value);
+    formData.append('fuente', document.getElementById('id_fuente').value);
+    formData.append('nivel_verificacion', document.getElementById('id_verificacion').value);
+    formData.append('descripcion', document.getElementById('id_descripcion').value);
+    formData.append('afectaciones_materiales', document.getElementById('id_afectaciones').value);
+    formData.append('necesidades_identificadas', document.getElementById('id_necesidades').value);
+    formData.append('autorizacion_registro', document.getElementById('id_autorizacion').checked);
+    formData.append('requiere_reserva', document.getElementById('id_reserva').checked);
+    formData.append('diligencia_nombre', document.getElementById('id_diligencia_nombre').value);
+    formData.append('diligencia_rol', document.getElementById('id_diligencia_rol').value);
+    const archivo = document.getElementById('id_archivo').files[0];
+    if (archivo) { formData.append('archivo_soporte', archivo); }
+
+    const headers = {};
+    const csrftoken = obtenerCookie('csrftoken');
+    if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
+
+    try {
+      const resp = await fetch('/api/casos/', { method: 'POST', headers: headers, body: formData });
+
+      if (resp.ok) {
+        alerta.innerHTML = '<div class="alert alert-success">¡Gracias! El reporte se guardó correctamente y quedó pendiente de revisión.</div>';
+        document.getElementById('formCaso').reset();
+      } else {
+        const errores = await resp.json();
+        const detalle = Object.entries(errores).map(([campo, msgs]) => `${campo}: ${Array.isArray(msgs) ? msgs.join(' ') : msgs}`).join('<br>');
+        alerta.innerHTML = `<div class="alert alert-danger">No se pudo guardar el reporte:<br>${detalle}</div>`;
+      }
+    } catch (e) {
+      alerta.innerHTML = '<div class="alert alert-danger">Error de conexión. Intenta de nuevo.</div>';
+    } finally {
+      boton.disabled = false;
+      boton.textContent = 'Enviar reporte';
+    }
+  });
 </script>
 {% endblock %}
