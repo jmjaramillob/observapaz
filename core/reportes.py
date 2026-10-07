@@ -127,7 +127,7 @@ def generar_pdf_caso(caso):
 
     elementos.append(Paragraph("Reporte de caso registrado", estilo_titulo))
     elementos.append(Paragraph(
-        "Red de Observatorios para la Paz Territorial — OBSERVAPAZ · "
+        "Red de Observatorios — OBSERVAPAZ · "
         "Reparación Transformadora, Paz Total",
         estilo_subtitulo,
     ))

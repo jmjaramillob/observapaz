@@ -175,7 +175,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label for="id_diligencia_rol" class="form-label">Rol / cargo</label>
-              <input type="text" id="id_diligencia_rol" class="form-control">
+              <input type="text" id="id_diligencia_rol" class="form-control" placeholder="Ej: ciudadano, gestor">
             </div>
           </div>
 
@@ -205,7 +205,7 @@
     return match ? match.pop() : '';
   }
 
-  let observatorioId = {% if observatorio %}{ { observatorio.id } } {% else %} null{% endif %};
+  let observatorioId = {% if observatorio %}{{ observatorio.id }} {% else %} null{% endif %};
 
   async function cargarObservatorios() {
     const select = document.getElementById('id_observatorio');

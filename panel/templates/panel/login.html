@@ -1,35 +1,95 @@
 {% extends "panel/base.html" %}
 {% block titulo %}Ingresar - OBSERVAPAZ{% endblock %}
+{% block clase_body %}pagina-login{% endblock %}
 
 {% block contenido %}
-<div class="row justify-content-center">
-  <div class="col-md-5">
-    <div class="card shadow-sm">
-      <div class="card-header bg-dark text-white">Acceso al tablero</div>
-      <div class="card-body">
-        {% if form.errors %}
-          <div class="alert alert-danger">Usuario o contraseña incorrectos.</div>
-        {% endif %}
-        <form method="post">
-          {% csrf_token %}
-          <div class="mb-3">
-            <label for="id_username" class="form-label">Usuario</label>
-            <input type="text" name="username" id="id_username" class="form-control" required autofocus>
-          </div>
-          <div class="mb-3">
-            <label for="id_password" class="form-label">Contraseña</label>
-            <input type="password" name="password" id="id_password" class="form-control" required>
-          </div>
-          <input type="hidden" name="next" value="{{ next }}">
-          <button type="submit" class="btn btn-dark w-100">Ingresar</button>
-        </form>
-        <hr>
-        <p class="small text-muted mb-0">
-          ¿Solo vas a registrar información?
-          <a href="{% url 'panel:formularios' %}">Ir a los formularios públicos</a> (no requieren cuenta).
-        </p>
+<div class="login-pagina">
+  <header class="login-encabezado">
+    <h1 class="login-encabezado__titulo">Acceso al sistema</h1>
+    <p class="login-encabezado__texto">Consulta, registro y análisis de información territorial para la construcción de paz en los territorios.</p>
+  </header>
+
+  <div class="card login-tarjeta">
+    <div class="login-tarjeta__cabecera">
+      <span class="login-tarjeta__icono">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.1" fill="currentColor"/></svg>
+      </span>
+      <div>
+        <h2 class="login-tarjeta__titulo">Acceso privado al sistema</h2>
+        <p class="login-tarjeta__apoyo">Inicia sesión para acceder a las herramientas de análisis, registro y gestión de información territorial.</p>
       </div>
     </div>
+
+    {% if form.errors %}
+      <div class="alert alert-danger py-2">Usuario o contraseña incorrectos.</div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label for="id_username" class="form-label">Usuario</label>
+        <div class="campo-icono">
+          <svg class="campo-icono__icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>
+          <input type="text" name="username" id="id_username" class="form-control" placeholder="Ingrese su usuario" autocomplete="username" required autofocus>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label for="id_password" class="form-label">Contraseña</label>
+        <div class="campo-icono campo-icono--ojo">
+          <svg class="campo-icono__icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+          <input type="password" name="password" id="id_password" class="form-control" placeholder="Ingrese su contraseña" autocomplete="current-password" required>
+          <button type="button" class="campo-icono__ojo" id="verClave" aria-label="Mostrar contraseña" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <input type="hidden" name="next" value="{{ next }}">
+      <button type="submit" class="btn btn-dark btn-ingresar btn-flecha w-100">Ingresar</button>
+    </form>
+
+    <div class="login-tarjeta__pie">
+      <p>¿Desea realizar únicamente un registro de información?</p>
+      <a href="{% url 'panel:formularios' %}">Ir al registro público de información.</a>
+    </div>
+  </div>
+
+  <div class="login-accesos">
+    <a class="acceso-rapido" href="{% url 'panel:publico' %}">
+      <span class="acceso-rapido__icono">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+      </span>
+      <span class="acceso-rapido__texto">
+        <span class="acceso-rapido__titulo">Consultar tablero público</span>
+        <span class="acceso-rapido__apoyo">Explore datos e indicadores territoriales</span>
+      </span>
+      <svg class="acceso-rapido__flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"/></svg>
+    </a>
+    <a class="acceso-rapido" href="{% url 'panel:formularios' %}">
+      <span class="acceso-rapido__icono">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="16" y2="15"/></svg>
+      </span>
+      <span class="acceso-rapido__texto">
+        <span class="acceso-rapido__titulo">Registrar información</span>
+        <span class="acceso-rapido__apoyo">Diligencie registros de información pública</span>
+      </span>
+      <svg class="acceso-rapido__flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 5 16 12 9 19"/></svg>
+    </a>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Mostrar u ocultar la contraseña
+  (function () {
+    const boton = document.getElementById('verClave');
+    const campo = document.getElementById('id_password');
+    boton.addEventListener('click', () => {
+      const visible = campo.type === 'text';
+      campo.type = visible ? 'password' : 'text';
+      boton.setAttribute('aria-pressed', String(!visible));
+      boton.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+    });
+  })();
+</script>
 {% endblock %}
