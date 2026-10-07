@@ -1,6 +1,6 @@
 # OBSERVAPAZ
 
-Proyecto para la Red de Observatorios para la Paz Territorial: registro
+Proyecto para la Red de Observatorios: registro
 de hechos victimizantes ocurridos en los municipios de cada observatorio,
 con moderación, tableros público/privado, y captura online y offline
 (ODK). Núcleo Django/DRF, base de datos única PostgreSQL.

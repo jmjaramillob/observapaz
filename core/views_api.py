@@ -1,4 +1,4 @@
-from django.db.models import Count, Sum
+from django.db.models import Count, Max, Sum
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponse
 from django.utils import timezone
@@ -6,6 +6,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from .filters import CasoVictimizanteFilter
 from .models import CasoVictimizante, EnvioODK, Observatorio, TipoHecho
 from .permissions import CasoVictimizantePermiso, SoloAutenticadoPermiso, SoloLecturaPublicaPermiso
 from .reportes import generar_pdf_caso
@@ -37,7 +38,7 @@ class TipoHechoViewSet(viewsets.ModelViewSet):
 class CasoVictimizanteViewSet(viewsets.ModelViewSet):
     serializer_class = CasoVictimizanteSerializer
     permission_classes = [CasoVictimizantePermiso]
-    filterset_fields = ["observatorio", "tipo_hecho", "estado", "fecha_hecho"]
+    filterset_class = CasoVictimizanteFilter
 
     def get_throttles(self):
         """
@@ -77,9 +78,34 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
             estado=CasoVictimizante.EstadoRevision.APROBADO
         )
 
+        # "Observatorios" del tablero: los activos que caen dentro del
+        # alcance territorial elegido (observatorio, departamento,
+        # municipio) y, si el usuario es de un observatorio, solo el suyo.
+        # El periodo y el tipo de hecho no cambian cuántos observatorios hay.
+        params = request.query_params
         obs_usuario = observatorio_del_usuario(request.user)
-        observatorio_param = request.query_params.get("observatorio")
-        alcance_unico = bool(obs_usuario or observatorio_param)
+        observatorios = Observatorio.objects.filter(activo=True)
+        if obs_usuario:
+            observatorios = observatorios.filter(pk=obs_usuario.pk)
+        if params.get("observatorio"):
+            observatorios = observatorios.filter(pk=params["observatorio"])
+        if params.get("departamento"):
+            observatorios = observatorios.filter(departamento__iexact=params["departamento"])
+        if params.get("municipio"):
+            observatorios = observatorios.filter(municipio__iexact=params["municipio"])
+
+        por_municipio = (
+            qs.values("observatorio__departamento", "observatorio__municipio")
+            .annotate(total=Count("id"))
+            .order_by("-total", "observatorio__municipio")
+        )
+        nombres_municipio = [r["observatorio__municipio"] or "Sin municipio" for r in por_municipio]
+        repetidos = {n for n in nombres_municipio if nombres_municipio.count(n) > 1}
+        etiquetas_municipio = [
+            f'{nombre} ({r["observatorio__departamento"] or "sin departamento"})'
+            if nombre in repetidos else nombre
+            for nombre, r in zip(nombres_municipio, por_municipio)
+        ]
 
         por_tipo = (
             qs.values("tipo_hecho__nombre")
@@ -87,9 +113,9 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
             .order_by("-total")
         )
         por_observatorio = (
-            qs.values("observatorio__codigo")
+            qs.values("observatorio__codigo", "observatorio__nombre")
             .annotate(total=Count("id"))
-            .order_by("observatorio__codigo")
+            .order_by("-total", "observatorio__codigo")
         )
         por_mes = (
             qs.annotate(mes=TruncMonth("fecha_hecho"))
@@ -106,10 +132,22 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
             familias=Sum("num_familias_afectadas"),
         )
 
+        # Cobertura territorial de los casos filtrados y fecha del último
+        # cambio en ellos (para los indicadores "Municipios con reportes"
+        # y "Última actualización").
+        municipios_con_reportes = sum(1 for r in por_municipio if r["observatorio__municipio"])
+        departamentos_con_reportes = len(
+            {r["observatorio__departamento"] for r in por_municipio if r["observatorio__departamento"]}
+        )
+        ultimo_cambio = qs.aggregate(m=Max("actualizado_en"))["m"]
+
         return Response(
             {
-                "total_observatorios": (
-                    1 if alcance_unico else Observatorio.objects.filter(activo=True).count()
+                "total_observatorios": observatorios.count(),
+                "municipios_con_reportes": municipios_con_reportes,
+                "departamentos_con_reportes": departamentos_con_reportes,
+                "ultima_actualizacion": (
+                    timezone.localtime(ultimo_cambio).date().isoformat() if ultimo_cambio else None
                 ),
                 "total_casos": qs.count(),
                 "poblacion": {k: (v or 0) for k, v in poblacion.items()},
@@ -117,8 +155,13 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
                     "labels": [r["tipo_hecho__nombre"] for r in por_tipo],
                     "data": [r["total"] for r in por_tipo],
                 },
+                "por_municipio": {
+                    "labels": etiquetas_municipio,
+                    "data": [r["total"] for r in por_municipio],
+                },
                 "por_observatorio": {
                     "labels": [r["observatorio__codigo"] for r in por_observatorio],
+                    "nombres": [r["observatorio__nombre"] for r in por_observatorio],
                     "data": [r["total"] for r in por_observatorio],
                 },
                 "por_mes": {

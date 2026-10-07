@@ -1,35 +1,59 @@
 {% extends "panel/base.html" %}
-{% block titulo %}Registro de casos - OBSERVAPAZ{% endblock %}
+{% block titulo %}Registro de información - OBSERVAPAZ{% endblock %}
 
 {% block contenido %}
-<h4 class="mb-1">Registro de casos</h4>
-<p class="text-muted">Comparte cualquiera de estos enlaces. No requieren usuario para diligenciarse.</p>
+<header class="encabezado-pagina">
+  <p class="encabezado-pagina__ojo">Acceso público</p>
+  <h1 class="encabezado-pagina__titulo">Registro de información</h1>
+  <p class="encabezado-pagina__texto">Acceda a los mecanismos públicos de captura habilitados para la Red de Observatorios. No se requiere usuario para diligenciar los registros.</p>
+</header>
 
-<div class="card mb-4">
-  <div class="card-body">
-    <a href="{% url 'panel:formulario_general' %}" class="btn btn-primary">
-      Registro general (todos los observatorios)
-    </a>
+<section class="card registro-general">
+  <span class="registro-general__icono">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8Z"/><polyline points="14 3 14 8 19 8"/><line x1="8.5" y1="13" x2="15.5" y2="13"/><line x1="8.5" y1="16.5" x2="15.5" y2="16.5"/></svg>
+  </span>
+  <div class="registro-general__cuerpo">
+    <h2 class="registro-general__titulo">Registro general de información</h2>
+    <p class="registro-general__texto">Diligencie el formulario general de la Red de Observatorios. Este registro permite compartir información de interés para todos los observatorios.</p>
   </div>
+  <a href="{% url 'panel:formulario_general' %}" class="btn btn-dark btn-flecha px-4">Abrir registro</a>
+</section>
+
+<div class="seccion-titulo">
+  <h2 class="seccion-titulo__texto">Observatorios disponibles</h2>
+  <p class="seccion-titulo__apoyo">Seleccione el observatorio y acceda a su formulario de registro.</p>
 </div>
 
-<div class="row">
+<div class="obs-grid">
   {% for obs in observatorios %}
-  <div class="col-md-6 col-lg-4">
-    <div class="card h-100">
-      <div class="card-body">
-        <h6 class="card-title mb-1">{{ obs.codigo }}</h6>
-        <p class="card-text small text-muted">{{ obs.nombre }}</p>
-        <a href="{% url 'panel:formulario_publico' obs.codigo %}" class="btn btn-sm btn-outline-primary">
-          Abrir registro
-        </a>
-      </div>
+  {% cycle 'brote' 'gente' 'escudo' 'apreton' as icono silent %}
+  <article class="card obs-tarjeta{% if icono == 'gente' or icono == 'apreton' %} obs-tarjeta--ocre{% endif %}">
+    <span class="obs-tarjeta__icono">
+      {% if icono == 'brote' %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 12C12 8 9.5 5.5 5 5.5c0 4 2.5 6.5 7 6.5Z"/><path d="M12 14c0-3.2 2-5.5 6.5-5.5 0 3.5-2.2 5.5-6.5 5.5Z"/></svg>
+      {% elif icono == 'gente' %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><circle cx="5.5" cy="10" r="2.3"/><circle cx="18.5" cy="10" r="2.3"/><path d="M6.5 19v-1.5A4.5 4.5 0 0 1 11 13h2a4.5 4.5 0 0 1 4.5 4.5V19"/></svg>
+      {% elif icono == 'escudo' %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5.5c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V6Z"/><polyline points="9 12 11.2 14.2 15.2 10"/></svg>
+      {% else %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l3.5-3.5 4 1.5 3-2 3.5 2.5L21 8"/><path d="M3 11l5 5a2 2 0 0 0 3 0l.8-.8M9.5 13l3 3a2 2 0 0 0 3 0L21 11"/></svg>
+      {% endif %}
+    </span>
+    <div class="obs-tarjeta__cuerpo">
+      <span class="obs-tarjeta__codigo">{{ obs.codigo }}</span>
+      <h3 class="obs-tarjeta__nombre">{{ obs.nombre }}</h3>
+      {% if obs.municipio or obs.departamento %}
+      <p class="obs-tarjeta__lugar">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+        {{ obs.municipio }}{% if obs.municipio and obs.departamento %}, {% endif %}{{ obs.departamento }}
+      </p>
+      {% endif %}
+      <p class="obs-tarjeta__texto">Registro público de información de este observatorio.</p>
     </div>
-  </div>
+    <a href="{% url 'panel:formulario_publico' obs.codigo %}" class="btn btn-dark btn-sm btn-flecha px-3">Abrir registro</a>
+  </article>
   {% empty %}
-  <div class="col">
-    <p class="text-muted">Aún no hay observatorios registrados. Créalos desde el panel de administración.</p>
-  </div>
+  <p class="text-muted">Aún no hay observatorios registrados. Créalos desde el panel de administración.</p>
   {% endfor %}
 </div>
 {% endblock %}

@@ -1,160 +1,41 @@
 {% extends "panel/base.html" %}
+{% load static %}
 {% block titulo %}Tablero público - OBSERVAPAZ{% endblock %}
 
 {% block contenido %}
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-  <div>
-    <h4 class="mb-0">
-      {% if obs_subdominio %}
-      Tablero de {{ obs_subdominio.codigo }} — {{ obs_subdominio.nombre }}
-      {% else %}
-      Tablero consolidado — Red de Observatorios
-      {% endif %}
-    </h4>
+<header class="tablero-banner">
+  <div class="tablero-banner__texto">
     {% if obs_subdominio %}
-    <small class="text-muted">
-      Información pública de este observatorio. <a href="#" id="enlaceVerRed">Ver el consolidado de toda la Red</a>.
-    </small>
+    <h1 class="tablero-banner__titulo">Tablero de {{ obs_subdominio.codigo }}</h1>
+    <p class="tablero-banner__subtitulo">{{ obs_subdominio.nombre }}</p>
+    <p class="tablero-banner__apoyo">
+      Cifras públicas y agregadas de este observatorio. La información detallada y sensible de cada caso es de uso restringido.
+      <a href="#" id="enlaceVerRed">Ver el consolidado de toda la Red</a>.
+    </p>
     {% else %}
-    <small class="text-muted">Cifras agregadas y públicas de toda la Red. El detalle de cada caso es
-      confidencial.</small>
+    <h1 class="tablero-banner__titulo">Tablero público consolidado</h1>
+    <p class="tablero-banner__subtitulo">Red de Observatorios</p>
+    <p class="tablero-banner__apoyo">Cifras públicas y agregadas de los observatorios activos. La información detallada y sensible de cada caso es de uso restringido.</p>
     {% endif %}
   </div>
-  {% if not user.is_authenticated %}
-  <a href="{% url 'panel:login' %}" class="btn btn-sm btn-outline-dark">Ingresar (equipo interno)</a>
-  {% endif %}
-</div>
+  <p class="tablero-banner__lema">Territorios que <b>informan</b> para construir paz</p>
+</header>
 
-<div class="indicadores mb-4">
-  <div class="indicador">
-    <span class="indicador__icono">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-        stroke-linejoin="round">
-        <path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    </span>
-    <span class="indicador__etiqueta">Observatorios activos</span>
-    <span class="indicador__valor" id="totalObservatorios">—</span>
-    <span class="indicador__nota">En toda la Red</span>
-  </div>
-  <div class="indicador">
-    <span class="indicador__icono">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-        stroke-linejoin="round">
-        <rect x="5" y="4" width="14" height="17" rx="2" />
-        <path d="M9 3h6v3H9z" />
-        <line x1="8" y1="11" x2="16" y2="11" />
-        <line x1="8" y1="15" x2="16" y2="15" />
-      </svg>
-    </span>
-    <span class="indicador__etiqueta">Casos registrados</span>
-    <span class="indicador__valor" id="totalCasos">—</span>
-    <span class="indicador__nota">Cifra acumulada</span>
-  </div>
-  <div class="indicador">
-    <span class="indicador__icono">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-        stroke-linejoin="round">
-        <path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20" />
-        <circle cx="9.5" cy="7.5" r="3.5" />
-        <path d="M19 20v-1.5a3.3 3.3 0 0 0-2.2-3.1" />
-        <path d="M14.3 4.2a3.5 3.5 0 0 1 0 6.6" />
-      </svg>
-    </span>
-    <span class="indicador__etiqueta">Personas afectadas</span>
-    <span class="indicador__valor" id="totalPersonas">—</span>
-    <span class="indicador__nota">Cifra acumulada</span>
-  </div>
-</div>
-
-<div class="row g-3 mb-4">
-  <div class="col-lg-8">
-    <div class="card h-100">
-      <div class="card-header">Casos por observatorio</div>
-      <div class="card-body"><canvas id="gObservatorios" height="120"></canvas></div>
-    </div>
-  </div>
-  <div class="col-lg-4">
-    <div class="card h-100">
-      <div class="card-header">Casos por tipo de hecho</div>
-      <div class="card-body"><canvas id="gTipoHecho" height="200"></canvas></div>
-    </div>
-  </div>
-</div>
-
-<div class="card mb-4">
-  <div class="card-header">Evolución mensual de casos</div>
-  <div class="card-body"><canvas id="gMeses" height="80"></canvas></div>
-</div>
-
-<div class="card mb-4">
-  <div class="card-header">Población afectada (acumulado)</div>
-  <div class="card-body">
-    <div class="row text-center g-3" id="filasPoblacion">
-      <div class="col text-muted">Cargando…</div>
-    </div>
-  </div>
-  <div class="card-footer text-muted small">
-    Estas cifras son agregadas y públicas. El detalle de cada caso (descripción, fuente, ubicación)
-    solo es visible para el equipo de cada observatorio, previo inicio de sesión.
-  </div>
-</div>
+{% include "panel/_tablero_filtrado.html" with etiqueta_casos="Casos registrados" pie_publico=True %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-  const obsSubdominio = {% if obs_subdominio %}{ { obs_subdominio.id } } {% else %} null{% endif %};
-  const paleta = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997', '#fd7e14', '#6610f2'];
+  // Desde el subdominio de un observatorio, el territorio queda fijo.
+  window.TABLERO_CONFIG = {
+    obsInicial: {% if obs_subdominio %}{{ obs_subdominio.id }}{% else %}null{% endif %},
+    bloquearTerritorio: {% if obs_subdominio %}true{% else %}false{% endif %},
+  };
 
   const enlaceRed = document.getElementById('enlaceVerRed');
   if (enlaceRed) {
     enlaceRed.href = `${window.location.protocol}//{{ dominio_base }}${window.location.port ? ':' + window.location.port : ''}/`;
   }
-
-  function dibujarChart(id, tipo, labels, data, opciones) {
-    let dataset;
-    if (tipo === 'doughnut') {
-      dataset = { data: data, backgroundColor: paleta };
-    } else if (tipo === 'line') {
-      dataset = {
-        label: 'Casos', data: data, borderColor: '#198754',
-        backgroundColor: 'rgba(25,135,84,.1)', fill: true, tension: 0.3
-      };
-    } else {
-      dataset = { label: 'Casos', data: data, backgroundColor: '#0d6efd' };
-    }
-    new Chart(document.getElementById(id), {
-      type: tipo,
-      data: { labels: labels, datasets: [dataset] },
-      options: opciones,
-    });
-  }
-
-  async function cargarTableroPublico() {
-    const params = obsSubdominio ? `?observatorio=${obsSubdominio}` : '';
-    const resumen = await fetch(`/api/casos/resumen/${params}`).then(r => r.json());
-
-    document.getElementById('totalObservatorios').textContent = resumen.total_observatorios;
-    document.getElementById('totalCasos').textContent = resumen.total_casos;
-    document.getElementById('totalPersonas').textContent = resumen.poblacion.personas;
-
-    dibujarChart('gObservatorios', 'bar', resumen.por_observatorio.labels, resumen.por_observatorio.data,
-      { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
-    dibujarChart('gTipoHecho', 'doughnut', resumen.por_tipo_hecho.labels, resumen.por_tipo_hecho.data,
-      { responsive: true, plugins: { legend: { position: 'bottom' } } });
-    dibujarChart('gMeses', 'line', resumen.por_mes.labels, resumen.por_mes.data,
-      { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
-
-    const p = resumen.poblacion;
-    document.getElementById('filasPoblacion').innerHTML = `
-    <div class="col-6 col-md-2"><h4 class="mb-0">${p.hombres}</h4><small class="text-muted">Hombres</small></div>
-    <div class="col-6 col-md-2"><h4 class="mb-0">${p.mujeres}</h4><small class="text-muted">Mujeres</small></div>
-    <div class="col-6 col-md-2"><h4 class="mb-0">${p.ninos_adolescentes}</h4><small class="text-muted">NNA</small></div>
-    <div class="col-6 col-md-2"><h4 class="mb-0">${p.adultos_mayores}</h4><small class="text-muted">Adultos mayores</small></div>
-    <div class="col-6 col-md-2"><h4 class="mb-0">${p.familias}</h4><small class="text-muted">Familias</small></div>
-  `;
-  }
-  cargarTableroPublico();
 </script>
+<script src="{% static 'panel/js/tablero_filtros.js' %}"></script>
 {% endblock %}

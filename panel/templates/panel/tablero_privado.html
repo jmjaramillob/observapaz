@@ -1,27 +1,22 @@
 {% extends "panel/base.html" %}
+{% load static %}
 {% block titulo %}Mi tablero - OBSERVAPAZ{% endblock %}
 
 {% block contenido %}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <div>
-    <h4 class="mb-0" id="tituloTablero">
-      {% if obs_usuario %}Tablero de {{ obs_usuario.codigo }} — {{ obs_usuario.nombre }}{% else %}Tablero de la Red (coordinación){% endif %}
-    </h4>
-    {% if not puede_filtrar %}
-      <small class="text-muted">Solo ves la información de tu observatorio.</small>
-    {% endif %}
+<header class="tablero-banner">
+  <div class="tablero-banner__texto">
+    <h1 class="tablero-banner__titulo">Mi tablero</h1>
+    <p class="tablero-banner__subtitulo" id="tituloTablero">
+      {% if obs_usuario %}{{ obs_usuario.codigo }} — {{ obs_usuario.nombre }}{% else %}Red de Observatorios (coordinación){% endif %}
+    </p>
+    <p class="tablero-banner__apoyo">
+      {% if obs_usuario %}Solo ves la información de tu observatorio, incluidos los casos pendientes y rechazados en la tabla.{% else %}Vista completa de la Red: puedes filtrar por territorio, observatorio, período y tipo de hecho.{% endif %}
+    </p>
   </div>
-  {% if puede_filtrar %}
-  <div class="d-flex align-items-center gap-2">
-    <label for="selectObservatorio" class="form-label mb-0 small text-muted">Observatorio:</label>
-    <select id="selectObservatorio" class="form-select form-select-sm">
-      <option value="">Todos (Red completa)</option>
-    </select>
-  </div>
-  {% endif %}
-</div>
+  <p class="tablero-banner__lema">Territorios que <b>informan</b> para construir paz</p>
+</header>
 
-<div class="alert alert-warning d-flex justify-content-between align-items-center" id="avisoPendientes" style="display:none;">
+<div class="alert alert-warning d-flex justify-content-between align-items-center mb-3" id="avisoPendientes" style="display:none;">
   <span>Tienes <strong id="contadorPendientes">0</strong> caso(s) pendiente(s) de revisión. No cuentan en las cifras de abajo hasta que se aprueben.</span>
   <a href="{% url 'panel:novedades' %}" class="btn btn-sm btn-warning">Ir a revisarlos</a>
 </div>
@@ -45,52 +40,10 @@
   </div>
 </div>
 
-<div class="indicadores mb-4">
-  <div class="indicador">
-    <span class="indicador__icono">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
-    </span>
-    <span class="indicador__etiqueta">Observatorios</span>
-    <span class="indicador__valor" id="totalObservatorios">—</span>
-  </div>
-  <div class="indicador">
-    <span class="indicador__icono">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="16" y2="15"/></svg>
-    </span>
-    <span class="indicador__etiqueta">Casos aprobados</span>
-    <span class="indicador__valor" id="totalCasos">—</span>
-  </div>
-  <div class="indicador">
-    <span class="indicador__icono">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M19 20v-1.5a3.3 3.3 0 0 0-2.2-3.1"/><path d="M14.3 4.2a3.5 3.5 0 0 1 0 6.6"/></svg>
-    </span>
-    <span class="indicador__etiqueta">Personas afectadas</span>
-    <span class="indicador__valor" id="totalPersonas">—</span>
-  </div>
-</div>
+{% include "panel/_tablero_filtrado.html" with etiqueta_casos="Casos aprobados" %}
 
-<div class="row g-3 mb-4">
-  <div class="col-lg-8">
-    <div class="card h-100">
-      <div class="card-header">Casos por observatorio</div>
-      <div class="card-body"><canvas id="gObservatorios" height="120"></canvas></div>
-    </div>
-  </div>
-  <div class="col-lg-4">
-    <div class="card h-100">
-      <div class="card-header">Casos por tipo de hecho</div>
-      <div class="card-body"><canvas id="gTipoHecho" height="200"></canvas></div>
-    </div>
-  </div>
-</div>
-
-<div class="card mb-4">
-  <div class="card-header">Evolución mensual de casos</div>
-  <div class="card-body"><canvas id="gMeses" height="80"></canvas></div>
-</div>
-
-<div class="card">
-  <div class="card-header">Casos registrados</div>
+<div class="card mt-3">
+  <div class="card-header card-titulo"><span class="card-titulo__texto">Casos registrados (según los filtros)</span></div>
   <div class="table-responsive">
     <table class="table table-striped table-hover mb-0 align-middle">
       <thead class="table-light">
@@ -112,8 +65,6 @@
 const obsFijo = {% if obs_usuario %}{{ obs_usuario.id }}{% else %}null{% endif %};
 const obsSubdominio = {% if obs_subdominio %}{{ obs_subdominio.id }}{% else %}null{% endif %};
 const mostrarAvisoLogin = {% if mostrar_aviso_pendientes %}true{% else %}false{% endif %};
-const paleta = ['#0d6efd','#198754','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14','#6610f2'];
-let graficos = {};
 
 const etiquetasVerificacion = {
   confirmado: 'Confirmado', en_verificacion: 'En verificación', no_verificado: 'No verificado',
@@ -121,6 +72,10 @@ const etiquetasVerificacion = {
 const etiquetasEstado = {
   pendiente: 'Pendiente', aprobado: 'Aprobado', rechazado: 'Rechazado',
 };
+
+function esc(t) {
+  return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 async function obtenerTodasPaginas(url) {
   let resultados = [];
@@ -133,57 +88,32 @@ async function obtenerTodasPaginas(url) {
   return resultados;
 }
 
-function dibujarChart(id, tipo, labels, data, opciones) {
-  if (graficos[id]) { graficos[id].destroy(); }
-  let dataset;
-  if (tipo === 'doughnut') {
-    dataset = { data: data, backgroundColor: paleta };
-  } else if (tipo === 'line') {
-    dataset = { label: 'Casos', data: data, borderColor: '#198754',
-                backgroundColor: 'rgba(25,135,84,.1)', fill: true, tension: 0.3 };
-  } else {
-    dataset = { label: 'Casos', data: data, backgroundColor: '#0d6efd' };
-  }
-  graficos[id] = new Chart(document.getElementById(id), {
-    type: tipo,
-    data: { labels: labels, datasets: [dataset] },
-    options: opciones,
-  });
-}
-
-async function cargarTablero(observatorioId) {
-  const params = observatorioId ? `?observatorio=${observatorioId}` : '';
-
-  const [resumen, casos] = await Promise.all([
-    fetch(`/api/casos/resumen/${params}`).then(r => r.json()),
-    obtenerTodasPaginas(`/api/casos/${params}`),
-  ]);
-
-  document.getElementById('totalObservatorios').textContent = resumen.total_observatorios;
-  document.getElementById('totalCasos').textContent = resumen.total_casos;
-  document.getElementById('totalPersonas').textContent = resumen.poblacion.personas;
-
-  dibujarChart('gObservatorios', 'bar', resumen.por_observatorio.labels, resumen.por_observatorio.data,
-    { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
-  dibujarChart('gTipoHecho', 'doughnut', resumen.por_tipo_hecho.labels, resumen.por_tipo_hecho.data,
-    { responsive: true, plugins: { legend: { position: 'bottom' } } });
-  dibujarChart('gMeses', 'line', resumen.por_mes.labels, resumen.por_mes.data,
-    { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } });
-
+// Tabla de casos: se vuelve a pedir cada vez que cambian los filtros.
+let pedidoTabla = 0;
+async function cargarTabla(params) {
+  const id = ++pedidoTabla;
   const filas = document.getElementById('filasCasos');
+  let casos;
+  try {
+    casos = await obtenerTodasPaginas('/api/casos/' + (params ? '?' + params : ''));
+  } catch (e) {
+    if (id === pedidoTabla) filas.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">No se pudo cargar la lista de casos.</td></tr>';
+    return;
+  }
+  if (id !== pedidoTabla) return;
   if (casos.length === 0) {
-    filas.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Aún no hay casos registrados.</td></tr>';
+    filas.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No hay casos con estos filtros.</td></tr>';
     return;
   }
   casos.sort((a, b) => (b.fecha_hecho || '').localeCompare(a.fecha_hecho || ''));
   filas.innerHTML = casos.map(c => `
     <tr>
-      <td><span class="badge bg-secondary">${c.observatorio_codigo}</span></td>
-      <td>${c.tipo_hecho_nombre || '—'}</td>
-      <td>${c.fecha_hecho}</td>
+      <td><span class="badge bg-secondary">${esc(c.observatorio_codigo)}</span></td>
+      <td>${esc(c.tipo_hecho_nombre) || '—'}</td>
+      <td>${esc(c.fecha_hecho)}</td>
       <td>${c.num_personas_afectadas ?? '—'}</td>
       <td>${etiquetasVerificacion[c.nivel_verificacion] || '—'}</td>
-      <td><span class="badge ${c.estado === 'aprobado' ? 'bg-success' : c.estado === 'rechazado' ? 'bg-danger' : 'bg-warning text-dark'}">${etiquetasEstado[c.estado] || c.estado}</span></td>
+      <td><span class="badge ${c.estado === 'aprobado' ? 'bg-success' : c.estado === 'rechazado' ? 'bg-danger' : 'bg-warning text-dark'}">${etiquetasEstado[c.estado] || esc(c.estado)}</span></td>
       <td><a href="/caso/${c.id}/" class="btn btn-sm btn-outline-primary">Ver detalle</a></td>
       <td><a href="/api/casos/${c.id}/reporte/" class="btn btn-sm btn-outline-secondary" title="Descargar reporte en PDF" target="_blank">Reporte PDF</a></td>
     </tr>
@@ -203,23 +133,15 @@ async function cargarPendientes() {
   }
 }
 
-(async function iniciar() {
-  cargarPendientes();
-  {% if puede_filtrar %}
-  const select = document.getElementById('selectObservatorio');
-  const observatorios = await obtenerTodasPaginas('/api/observatorios/?activo=true');
-  observatorios.forEach(obs => {
-    const opt = document.createElement('option');
-    opt.value = obs.id;
-    opt.textContent = `${obs.codigo} - ${obs.nombre}`;
-    select.appendChild(opt);
-  });
-  select.addEventListener('change', () => cargarTablero(select.value || null));
-  if (obsSubdominio) { select.value = obsSubdominio; }
-  cargarTablero(obsSubdominio);
-  {% else %}
-  cargarTablero(obsFijo);
-  {% endif %}
-})();
+// Usuarios de un observatorio: territorio fijo en el suyo (la API además
+// lo exige). Coordinación: filtra libremente; si entró desde el
+// subdominio de un observatorio, arranca ya filtrado ahí.
+window.TABLERO_CONFIG = {
+  obsInicial: obsFijo || obsSubdominio,
+  bloquearTerritorio: obsFijo !== null,
+  alActualizar: cargarTabla,
+};
+cargarPendientes().catch(() => {});
 </script>
+<script src="{% static 'panel/js/tablero_filtros.js' %}"></script>
 {% endblock %}
