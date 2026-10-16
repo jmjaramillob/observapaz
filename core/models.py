@@ -1,7 +1,12 @@
+import uuid
+from pathlib import Path
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 EXTENSIONES_SOPORTE_PERMITIDAS = ["pdf", "jpg", "jpeg", "png", "doc", "docx"]
 TAMANO_MAXIMO_SOPORTE_MB = 10
@@ -235,6 +240,53 @@ class CasoVictimizante(models.Model):
         return f"{self.tipo_hecho} - {self.observatorio.codigo} ({self.fecha_hecho})"
 
 
+def _ruta_evidencia(instance, filename):
+    # El nombre en disco es aleatorio: el nombre original (que puede traer
+    # datos personales) se guarda aparte en 'nombre_original'.
+    ext = Path(filename).suffix.lower()
+    return f"casos/{instance.caso.observatorio.codigo}/{instance.caso_id}/{uuid.uuid4().hex}{ext}"
+
+
+class EvidenciaCaso(models.Model):
+    """
+    Foto o documento que respalda un caso (varios por caso). Nunca se
+    publica con una URL directa: se descarga o se ve solo a través de
+    /api/casos/<id>/evidencias/<id>/, que exige sesión iniciada y
+    respeta el aislamiento por observatorio.
+    """
+
+    class Tipo(models.TextChoices):
+        FOTO = "foto", "Foto"
+        DOCUMENTO = "documento", "Documento"
+
+    caso = models.ForeignKey(
+        "CasoVictimizante", on_delete=models.CASCADE, related_name="evidencias"
+    )
+    archivo = models.FileField(upload_to=_ruta_evidencia, max_length=300)
+    nombre_original = models.CharField(max_length=255, blank=True)
+    tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.DOCUMENTO)
+    tamano_bytes = models.PositiveIntegerField(default=0)
+    origen_odk = models.CharField(
+        "Nombre del adjunto en ODK Central", max_length=255, blank=True
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Evidencia del caso"
+        verbose_name_plural = "Evidencias del caso"
+
+    def __str__(self):
+        return self.nombre_original or Path(self.archivo.name).name
+
+
+@receiver(post_delete, sender=EvidenciaCaso)
+def _borrar_archivo_de_evidencia(sender, instance, **kwargs):
+    """Al borrar la evidencia (o su caso) se borra también el archivo del disco."""
+    if instance.archivo:
+        instance.archivo.delete(save=False)
+
+
 class EnvioODK(models.Model):
     """
     Envío crudo recibido desde ODK Central (online u offline).
@@ -249,6 +301,14 @@ class EnvioODK(models.Model):
     datos = models.JSONField()
     recibido_en = models.DateTimeField(auto_now_add=True)
     procesado = models.BooleanField(default=False)
+    error = models.TextField(
+        blank=True, help_text="Último error al convertir el envío en caso (vacío si no hubo)."
+    )
+    caso = models.ForeignKey(
+        "CasoVictimizante", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="envios_odk",
+        help_text="Caso creado a partir de este envío (permite reintentar adjuntos).",
+    )
 
     class Meta:
         ordering = ["-recibido_en"]

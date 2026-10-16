@@ -1,11 +1,12 @@
 from django.db.models import Count, Max, Sum
 from django.db.models.functions import TruncMonth
-from django.http import HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from . import evidencias as reglas_evidencia
 from .filters import CasoVictimizanteFilter
 from .models import CasoVictimizante, EnvioODK, Observatorio, TipoHecho
 from .permissions import CasoVictimizantePermiso, SoloAutenticadoPermiso, SoloLecturaPublicaPermiso
@@ -58,7 +59,9 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
         importar qué filtros le pase en la URL-. Si es de coordinación
         (o anónimo, para el caso de 'resumen'), no se acota aquí.
         """
-        qs = CasoVictimizante.objects.select_related("observatorio", "tipo_hecho")
+        qs = CasoVictimizante.objects.select_related(
+            "observatorio", "tipo_hecho"
+        ).prefetch_related("evidencias")
         obs = observatorio_del_usuario(self.request.user)
         if obs:
             qs = qs.filter(observatorio=obs)
@@ -208,6 +211,46 @@ class CasoVictimizanteViewSet(viewsets.ModelViewSet):
         nombre_archivo = f"reporte_caso_{caso.id}.pdf"
         respuesta = HttpResponse(pdf, content_type="application/pdf")
         respuesta["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+        return respuesta
+
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"evidencias/(?P<evidencia_id>[0-9]+)",
+    )
+    def evidencia(self, request, pk=None, evidencia_id=None):
+        """
+        Entrega una foto o documento del caso. Requiere sesión iniciada y
+        acceso al caso (self.get_object() aplica el aislamiento por
+        observatorio: un gestor no puede abrir archivos de otro
+        observatorio). Las fotos y los PDF se muestran en el navegador;
+        los documentos de Word se descargan. Con ?descargar=1 siempre se
+        descarga.
+        """
+        caso = self.get_object()
+        ev = caso.evidencias.filter(pk=evidencia_id).first()
+        if ev is None or not ev.archivo:
+            raise Http404("Archivo no encontrado.")
+        try:
+            handle = ev.archivo.open("rb")
+        except FileNotFoundError:
+            raise Http404("El archivo ya no está en el servidor.")
+
+        nombre = ev.nombre_original or "archivo"
+        ver = (
+            reglas_evidencia.se_ve_en_navegador(nombre)
+            and request.query_params.get("descargar") != "1"
+        )
+        # El tipo de contenido sale de la extensión validada al subirlo,
+        # nunca de lo que diga quien lo subió.
+        respuesta = FileResponse(
+            handle,
+            content_type=reglas_evidencia.tipo_contenido(nombre),
+            as_attachment=not ver,
+            filename=nombre,
+        )
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        respuesta["Content-Security-Policy"] = "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
+        respuesta["Cache-Control"] = "private, no-store"
         return respuesta
 
     @action(detail=True, methods=["post"])

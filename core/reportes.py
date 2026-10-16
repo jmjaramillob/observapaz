@@ -9,6 +9,7 @@ los campos visibles en la página de detalle del caso.
 
 import io
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from django.conf import settings
 from django.utils import timezone
@@ -184,9 +185,11 @@ def generar_pdf_caso(caso):
         elementos.append(Paragraph("Necesidades identificadas", estilo_seccion))
         elementos.append(Paragraph(caso.necesidades_identificadas, estilo_texto))
 
-    if caso.archivo_soporte:
-        elementos.append(Paragraph("Documento de soporte", estilo_seccion))
-        elementos.append(Paragraph(Path(caso.archivo_soporte.name).name, estilo_texto))
+    evidencias = list(caso.evidencias.all())
+    if evidencias:
+        elementos.append(Paragraph("Evidencias (fotos y documentos)", estilo_seccion))
+        for ev in evidencias:
+            elementos.append(Paragraph(f"• {escape(ev.nombre_original or 'archivo')}", estilo_texto))
 
     # --- Consentimiento y diligenciamiento ---
     consentimiento = [

@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 
 from .models import Observatorio
@@ -41,4 +43,10 @@ class ObservatorioSubdominioMiddleware:
             # subdominio de observatorio válido.
             return None
 
-        return Observatorio.objects.filter(codigo__iexact=subdominio, activo=True).first()
+        # "obs1", "obs24" u "obs-007" se traducen a "OBS-001", "OBS-024", "OBS-007"
+        coincidencia = re.fullmatch(r"obs-?0*(\d{1,3})", subdominio)
+        if coincidencia:
+            codigo = f"OBS-{int(coincidencia.group(1)):03d}"
+        else:
+            codigo = subdominio
+        return Observatorio.objects.filter(codigo__iexact=codigo, activo=True).first()

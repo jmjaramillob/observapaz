@@ -2,8 +2,21 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 import requests
+from datetime import timedelta
 
-from core.models import CasoVictimizante, EnvioODK, Observatorio, TipoHecho
+from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.db import transaction
+from django.utils import timezone
+
+from core import evidencias as reglas_evidencia
+from core.models import CasoVictimizante, EnvioODK, EvidenciaCaso, Observatorio, TipoHecho
+
+# Campos del XLSForm que llevan un archivo adjunto (fotos y documento).
+CAMPOS_ADJUNTOS = ["foto_1", "foto_2", "foto_3", "documento_1"]
+# Días que se espera a que Collect termine de subir un adjunto antes de
+# darlo por perdido y cerrar el envío.
+DIAS_ESPERA_ADJUNTOS = 7
 
 
 def _si_no_a_booleano(valor):
@@ -82,9 +95,15 @@ class Command(BaseCommand):
         headers = {"Authorization": f"Bearer {token}"}
         nuevos = 0
 
+        # Solo se piden los envíos desde unos días antes de la última lectura
+        # (o desde el envío pendiente más antiguo), en vez de releer todo.
+        desde = self._fecha_desde(observatorio)
+        params = {"$filter": f"__system/submissionDate ge {desde}"} if desde else None
+
         while url:
             try:
-                resp = requests.get(url, headers=headers, timeout=30)
+                resp = requests.get(url, headers=headers, params=params, timeout=30)
+                params = None  # el enlace de la página siguiente ya trae sus parámetros
             except requests.RequestException as e:
                 self.stderr.write(self.style.ERROR(f"{observatorio.codigo}: error de red ({e})."))
                 return nuevos
@@ -101,20 +120,38 @@ class Command(BaseCommand):
 
             datos = resp.json()
             for envio in datos.get("value", []):
-                if self._procesar_envio(observatorio, form_id, envio):
+                if self._procesar_envio(observatorio, form_id, envio, token):
                     nuevos += 1
 
             url = datos.get("@odata.nextLink")
 
         return nuevos
 
-    def _procesar_envio(self, observatorio, form_id, envio):
+    def _fecha_desde(self, observatorio):
+        """Fecha (UTC, formato OData) desde la cual pedir envíos; None = todos."""
+        ultimo = (
+            EnvioODK.objects.filter(observatorio=observatorio)
+            .order_by("-recibido_en").values_list("recibido_en", flat=True).first()
+        )
+        if ultimo is None:
+            return None
+        desde = ultimo - timedelta(days=2)
+        pendiente = (
+            EnvioODK.objects.filter(observatorio=observatorio, procesado=False)
+            .order_by("recibido_en").values_list("recibido_en", flat=True).first()
+        )
+        if pendiente is not None:
+            desde = min(desde, pendiente - timedelta(days=1))
+        return desde.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    def _procesar_envio(self, observatorio, form_id, envio, token=None):
         envio_id = envio.get("__id")
         if not envio_id:
             return False
 
-        # 'envio_id' es único en nuestra tabla: si ya lo habíamos traído
-        # antes, get_or_create simplemente lo encuentra y no repite nada.
+        # 'envio_id' es único en nuestra tabla: si ya lo habíamos traído y
+        # quedó completo, no se repite nada. Si quedó incompleto (tipo de
+        # hecho desconocido, adjuntos que aún no llegan), se reintenta.
         envio_odk, creado = EnvioODK.objects.get_or_create(
             envio_id=envio_id,
             defaults={
@@ -123,13 +160,99 @@ class Command(BaseCommand):
                 "datos": envio,
             },
         )
-        if not creado:
+        if envio_odk.procesado:
             return False
 
-        self._convertir_a_caso(observatorio, envio_odk, envio)
-        return True
+        try:
+            self._convertir_a_caso(observatorio, envio_odk, envio, token)
+            if envio_odk.error:
+                envio_odk.error = ""
+                envio_odk.save(update_fields=["error"])
+        except Exception as e:  # un envío malo no debe frenar a los demás
+            mensaje = f"{type(e).__name__}: {e}"
+            self.stderr.write(
+                self.style.ERROR(f"Envío {envio_id}: no se pudo convertir ({mensaje}); queda registrado para revisarlo.")
+            )
+            envio_odk.error = mensaje[:2000]
+            envio_odk.save(update_fields=["error"])
+            return False
+        return creado
 
-    def _convertir_a_caso(self, observatorio, envio_odk, envio):
+    def _convertir_a_caso(self, observatorio, envio_odk, envio, token=None):
+        caso = envio_odk.caso
+        if caso is None:
+            with transaction.atomic():
+                caso = self._crear_caso(observatorio, envio_odk, envio)
+            if caso is None:
+                return
+        if self._traer_adjuntos(observatorio, envio_odk, caso, envio, token):
+            envio_odk.procesado = True
+            envio_odk.save(update_fields=["procesado"])
+
+    def _traer_adjuntos(self, observatorio, envio_odk, caso, envio, token):
+        """
+        Descarga de Central las fotos/documento del envío y los guarda como
+        evidencias del caso. Devuelve True si no queda nada pendiente.
+        Collect sube los adjuntos después del formulario, así que un 404
+        significa "todavía no llega": se reintenta en la próxima corrida
+        (hasta DIAS_ESPERA_ADJUNTOS días).
+        """
+        if not token:
+            return True
+        base = settings.ODK_CENTRAL_URL.rstrip("/")
+        proyecto = settings.ODK_CENTRAL_PROJECT_ID
+        pendiente = False
+        ya = set(caso.evidencias.values_list("origen_odk", flat=True))
+        for campo in CAMPOS_ADJUNTOS:
+            nombre = envio.get(campo)
+            if not nombre or nombre in ya:
+                continue
+            url = (
+                f"{base}/v1/projects/{proyecto}/forms/{envio_odk.formulario_id}"
+                f"/submissions/{envio_odk.envio_id}/attachments/{nombre}"
+            )
+            try:
+                resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=60)
+            except requests.RequestException as e:
+                self.stderr.write(self.style.WARNING(f"{envio_odk.envio_id}: error de red con {nombre} ({e})."))
+                pendiente = True
+                continue
+            if resp.status_code == 404:
+                pendiente = True
+                continue
+            if not resp.ok:
+                self.stderr.write(self.style.WARNING(f"{envio_odk.envio_id}: Central respondió {resp.status_code} para {nombre}."))
+                pendiente = True
+                continue
+
+            archivo = ContentFile(resp.content, name=nombre)
+            try:
+                reglas_evidencia.validar_evidencia(archivo)
+                if caso.evidencias.count() >= reglas_evidencia.MAX_ARCHIVOS_POR_CASO:
+                    raise ValidationError("Se alcanzó el máximo de archivos por caso.")
+            except ValidationError as e:
+                self.stderr.write(self.style.WARNING(f"{envio_odk.envio_id}: se omite {nombre}: {' '.join(e.messages)}"))
+                continue
+            EvidenciaCaso.objects.create(
+                caso=caso,
+                archivo=archivo,
+                nombre_original=nombre,
+                origen_odk=nombre,
+                tipo=(
+                    EvidenciaCaso.Tipo.FOTO if reglas_evidencia.es_foto(nombre)
+                    else EvidenciaCaso.Tipo.DOCUMENTO
+                ),
+                tamano_bytes=len(resp.content),
+            )
+
+        if pendiente and timezone.now() - envio_odk.recibido_en > timedelta(days=DIAS_ESPERA_ADJUNTOS):
+            self.stderr.write(self.style.WARNING(
+                f"{envio_odk.envio_id}: adjuntos que nunca llegaron; se cierra el envío sin ellos."
+            ))
+            return True
+        return not pendiente
+
+    def _crear_caso(self, observatorio, envio_odk, envio):
         tipo_hecho = None
         try:
             tipo_hecho = TipoHecho.objects.get(pk=envio.get("tipo_hecho"))
@@ -140,9 +263,9 @@ class Command(BaseCommand):
                     "no existe -queda guardado en EnvioODK sin convertir, para revisarlo a mano-."
                 )
             )
-            return
+            return None
 
-        CasoVictimizante.objects.create(
+        caso = CasoVictimizante.objects.create(
             observatorio=observatorio,
             fecha_hecho=envio.get("fecha_hecho"),
             vereda_corregimiento_barrio=envio.get("vereda_corregimiento_barrio") or "",
@@ -174,5 +297,6 @@ class Command(BaseCommand):
             diligencia_rol=envio.get("diligencia_rol") or "",
             estado=CasoVictimizante.EstadoRevision.PENDIENTE,
         )
-        envio_odk.procesado = True
-        envio_odk.save(update_fields=["procesado"])
+        envio_odk.caso = caso
+        envio_odk.save(update_fields=["caso"])
+        return caso
