@@ -48,8 +48,31 @@
     <p>{{ caso.necesidades_identificadas|linebreaksbr }}</p>
     {% endif %}
 
-    {% if caso.archivo_soporte %}
-    <p><strong>Documento de soporte:</strong> <a href="{{ caso.archivo_soporte.url }}" target="_blank">ver archivo</a></p>
+    {% if caso.evidencias.all %}
+    <h6 class="text-muted">Evidencias (fotos y documentos)</h6>
+    <div class="row g-3 mb-4">
+      {% for ev in caso.evidencias.all %}
+      <div class="col-6 col-md-3">
+        <div class="border rounded p-2 h-100 text-center">
+          {% if ev.tipo == "foto" %}
+          <a href="/api/casos/{{ caso.id }}/evidencias/{{ ev.id }}/" target="_blank" rel="noopener">
+            <img src="/api/casos/{{ caso.id }}/evidencias/{{ ev.id }}/" alt="{{ ev.nombre_original }}"
+                 class="img-fluid rounded mb-2" style="max-height:140px; object-fit:cover;" loading="lazy">
+          </a>
+          {% else %}
+          <div class="display-6 text-secondary mb-2">&#128196;</div>
+          {% endif %}
+          <div class="small text-break mb-2">{{ ev.nombre_original }}</div>
+          <div class="d-flex gap-1 justify-content-center flex-wrap">
+            {% if ev.tipo == "foto" or ev.nombre_original|lower|slice:"-4:" == ".pdf" %}
+            <a class="btn btn-sm btn-outline-primary" href="/api/casos/{{ caso.id }}/evidencias/{{ ev.id }}/" target="_blank" rel="noopener">Ver</a>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary" href="/api/casos/{{ caso.id }}/evidencias/{{ ev.id }}/?descargar=1">Descargar</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
     {% endif %}
 
     <div class="row mb-3">

@@ -32,12 +32,14 @@
             Novedades
             <span class="sidebar__badge js-badge-novedades">0</span>
         </a>
+        {% if user.is_staff %}
         <a class="sidebar__link" href="/admin/">
             <span class="sidebar__icono">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l1.9-1.4-2-3.4-2.2.8a7.6 7.6 0 0 0-2.6-1.5L14 2.5h-4l-.5 2.5a7.6 7.6 0 0 0-2.6 1.5l-2.2-.8-2 3.4L4.6 10.5a7.6 7.6 0 0 0 0 3l-1.9 1.4 2 3.4 2.2-.8a7.6 7.6 0 0 0 2.6 1.5l.5 2.5h4l.5-2.5a7.6 7.6 0 0 0 2.6-1.5l2.2.8 2-3.4-1.9-1.4Z"/></svg>
             </span>
             Administración
         </a>
+        {% endif %}
     {% endif %}
 </nav>
 

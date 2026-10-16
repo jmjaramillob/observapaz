@@ -63,8 +63,8 @@
             <footer class="pie-sitio">
                 <div class="pie-sitio__enlaces">
                     <span>Red de Observatorios</span>
-                    <a href="#">Política de privacidad</a>
-                    <a href="#">Soporte</a>
+                    {% if politica_privacidad_url %}<a href="{{ politica_privacidad_url }}" target="_blank" rel="noopener">Política de privacidad</a>{% endif %}
+                    {% if soporte_email %}<a href="mailto:{{ soporte_email }}">Soporte</a>{% endif %}
                 </div>
                 <span>Versión 1.0</span>
             </footer>

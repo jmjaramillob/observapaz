@@ -39,6 +39,12 @@ class Command(BaseCommand):
                 )
             )
 
+        # El campo "Especifique" solo se muestra cuando se elige el tipo
+        # "Otro". Los 'name' de las opciones son IDs, así que la condición
+        # debe usar el ID de "Otro" (no el texto).
+        tipo_otro = tipos_hecho.filter(nombre__iexact="otro").first()
+        relevante_otro = f"${{tipo_hecho}}='{tipo_otro.id}'" if tipo_otro else "false()"
+
         wb = Workbook()
 
         survey = wb.active
@@ -51,7 +57,7 @@ class Command(BaseCommand):
         survey.append(["select_one zonas", "zona", "Zona", "no", "", "", ""])
         survey.append(["select_one tipos_hecho", "tipo_hecho", "Tipo de hecho", "yes", "", "", ""])
         survey.append(
-            ["text", "tipo_hecho_otro", "Especifique el tipo de hecho", "no", "", "${tipo_hecho}='otro'", ""]
+            ["text", "tipo_hecho_otro", "Especifique el tipo de hecho", "no", "", relevante_otro, ""]
         )
         survey.append(["select_one responsables", "presunto_responsable", "Presunto responsable", "no", "", "", ""])
         survey.append(["text", "presunto_responsable_detalle", "Detalle del presunto responsable", "no", "", "", ""])
@@ -71,6 +77,11 @@ class Command(BaseCommand):
         )
         survey.append(["text", "afectaciones_materiales", "Afectaciones materiales", "no", "multiline", "", ""])
         survey.append(["text", "necesidades_identificadas", "Necesidades inmediatas identificadas", "no", "multiline", "", ""])
+        hint_foto = "Opcional. Evite fotos donde se pueda identificar a las víctimas."
+        survey.append(["image", "foto_1", "Foto 1 (opcional)", "no", "", "", hint_foto])
+        survey.append(["image", "foto_2", "Foto 2 (opcional)", "no", "", "", ""])
+        survey.append(["image", "foto_3", "Foto 3 (opcional)", "no", "", "", ""])
+        survey.append(["file", "documento_1", "Documento (PDF o Word, opcional)", "no", "", "", "Solo PDF, DOC o DOCX. No se aceptan videos."])
         survey.append(["select_one si_no", "autorizacion_registro", "¿Se autorizó expresamente registrar este hecho?", "yes", "", "", ""])
         survey.append(["select_one si_no", "requiere_reserva", "¿Requiere manejo confidencial/reservado?", "no", "", "", ""])
         survey.append(["text", "diligencia_nombre", "Nombre de quien diligencia", "no", "", "", ""])

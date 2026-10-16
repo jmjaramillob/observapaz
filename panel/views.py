@@ -63,7 +63,7 @@ def tablero_publico(request):
     cifras por defecto (con un enlace para ver el consolidado de toda
     la Red); desde el dominio raíz, muestra la Red completa.
     """
-    contexto = {"obs_subdominio": request.observatorio, "dominio_base": settings.DOMINIO_BASE}
+    contexto = {"obs_subdominio": request.observatorio, "url_red": settings.SITIO_URL_BASE.rstrip("/") + "/"}
     return render(request, "panel/tablero_publico.html", contexto)
 
 

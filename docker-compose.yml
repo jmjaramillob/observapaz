@@ -18,6 +18,7 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
+      - media_data:/app/media
     env_file: .env
     depends_on:
       - db
@@ -37,3 +38,4 @@ services:
 volumes:
   postgres_data:
   static_volume:
+  media_data:

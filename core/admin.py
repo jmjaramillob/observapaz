@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from .models import CasoVictimizante, EnvioODK, Observatorio, PerfilUsuario, TipoHecho
+from .models import CasoVictimizante, EnvioODK, EvidenciaCaso, Observatorio, PerfilUsuario, TipoHecho
 
 # Texto genérico del panel de administración: por defecto Django muestra
 # "Django administration" en el título de la pestaña y en el encabezado.
@@ -27,6 +27,19 @@ class TipoHechoAdmin(admin.ModelAdmin):
     search_fields = ("nombre",)
 
 
+class EvidenciaCasoInline(admin.TabularInline):
+    """Lista las fotos/documentos del caso (solo ver y borrar; se suben desde el formulario)."""
+
+    model = EvidenciaCaso
+    extra = 0
+    can_delete = True
+    fields = ("nombre_original", "tipo", "tamano_bytes", "creado_en")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(CasoVictimizante)
 class CasoVictimizanteAdmin(admin.ModelAdmin):
     list_display = (
@@ -36,6 +49,8 @@ class CasoVictimizanteAdmin(admin.ModelAdmin):
     list_filter = ("estado", "tipo_hecho", "observatorio", "nivel_verificacion", "requiere_reserva")
     search_fields = ("descripcion", "vereda_corregimiento_barrio")
     date_hierarchy = "fecha_hecho"
+    inlines = [EvidenciaCasoInline]
+    exclude = ("archivo_soporte",)
     actions = ["aprobar_seleccionados", "rechazar_seleccionados"]
 
     @admin.action(description="Marcar seleccionados como aprobados")
@@ -57,7 +72,7 @@ class CasoVictimizanteAdmin(admin.ModelAdmin):
 
 @admin.register(EnvioODK)
 class EnvioODKAdmin(admin.ModelAdmin):
-    list_display = ("formulario_id", "envio_id", "observatorio", "recibido_en", "procesado")
+    list_display = ("formulario_id", "envio_id", "observatorio", "recibido_en", "procesado", "error")
     list_filter = ("observatorio", "procesado")
     search_fields = ("formulario_id", "envio_id")
 

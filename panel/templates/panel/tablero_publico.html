@@ -34,7 +34,7 @@
 
   const enlaceRed = document.getElementById('enlaceVerRed');
   if (enlaceRed) {
-    enlaceRed.href = `${window.location.protocol}//{{ dominio_base }}${window.location.port ? ':' + window.location.port : ''}/`;
+    enlaceRed.href = '{{ url_red|escapejs }}';
   }
 </script>
 <script src="{% static 'panel/js/tablero_filtros.js' %}"></script>

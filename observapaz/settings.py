@@ -63,10 +63,15 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "panel.context_processors.enlaces_pie",
             ],
         },
     },
 ]
+
+# Enlaces del pie de página. Vacíos = el enlace no se muestra.
+SOPORTE_EMAIL = os.environ.get("SOPORTE_EMAIL", "")
+POLITICA_PRIVACIDAD_URL = os.environ.get("POLITICA_PRIVACIDAD_URL", "")
 
 WSGI_APPLICATION = "observapaz.wsgi.application"
 
@@ -98,7 +103,14 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "panel" / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Fotos y documentos de los casos. Viven FUERA del código (en Docker, en el
+# volumen media_data) y NUNCA se sirven con una URL pública: solo se entregan
+# a usuarios con sesión y acceso al caso (ver CasoVictimizanteViewSet.evidencia).
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
+MEDIA_URL = "/media/"
+
 STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },

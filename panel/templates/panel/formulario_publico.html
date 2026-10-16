@@ -51,7 +51,7 @@
           </div>
           <div class="mb-3">
             <label for="id_vereda" class="form-label">Vereda, corregimiento o barrio</label>
-            <input type="text" id="id_vereda" class="form-control">
+            <input type="text" id="id_vereda" class="form-control" maxlength="200">
           </div>
 
           <h6 class="text-muted mt-4">Tipo de hecho y presunto responsable</h6>
@@ -63,7 +63,7 @@
           </div>
           <div class="mb-3">
             <label for="id_tipo_hecho_otro" class="form-label">Si eligió "Otro", especifique</label>
-            <input type="text" id="id_tipo_hecho_otro" class="form-control">
+            <input type="text" id="id_tipo_hecho_otro" class="form-control" maxlength="200">
           </div>
           <div class="row">
             <div class="col-md-6 mb-3">
@@ -79,7 +79,7 @@
             </div>
             <div class="col-md-6 mb-3">
               <label for="id_responsable_detalle" class="form-label">Detalle (opcional)</label>
-              <input type="text" id="id_responsable_detalle" class="form-control">
+              <input type="text" id="id_responsable_detalle" class="form-control" maxlength="200">
             </div>
           </div>
 
@@ -123,7 +123,7 @@
           <div class="row">
             <div class="col-md-6 mb-3">
               <label for="id_fuente" class="form-label">Fuente de la información</label>
-              <input type="text" id="id_fuente" class="form-control"
+              <input type="text" id="id_fuente" class="form-control" maxlength="200"
                 placeholder="Ej: comunidad, autoridad local, medios">
             </div>
             <div class="col-md-6 mb-3">
@@ -136,23 +136,25 @@
             </div>
           </div>
           <div class="mb-3">
-            <label for="id_archivo" class="form-label">Documento de soporte (opcional)</label>
-            <input type="file" id="id_archivo" class="form-control">
+            <label for="id_archivo" class="form-label">Fotos y documentos de soporte (opcional)</label>
+            <input type="file" id="id_archivo" class="form-control" multiple
+              accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,image/jpeg,image/png,application/pdf">
+            <div class="form-text">Hasta 5 archivos de máximo 10 MB cada uno: fotos (JPG, PNG) o documentos (PDF, Word). No se aceptan videos. Evita fotos donde se pueda identificar a las víctimas.</div>
           </div>
 
           <h6 class="text-muted mt-4">Descripción</h6>
           <div class="mb-3">
             <label for="id_descripcion" class="form-label">Descripción del hecho</label>
-            <textarea id="id_descripcion" class="form-control" rows="3"
+            <textarea id="id_descripcion" class="form-control js-contador" maxlength="2000" rows="3"
               placeholder="Sin nombres ni datos que identifiquen a víctimas"></textarea>
           </div>
           <div class="mb-3">
             <label for="id_afectaciones" class="form-label">Afectaciones materiales</label>
-            <textarea id="id_afectaciones" class="form-control" rows="2"></textarea>
+            <textarea id="id_afectaciones" class="form-control js-contador" maxlength="2000" rows="2"></textarea>
           </div>
           <div class="mb-3">
             <label for="id_necesidades" class="form-label">Necesidades inmediatas identificadas</label>
-            <textarea id="id_necesidades" class="form-control" rows="2"></textarea>
+            <textarea id="id_necesidades" class="form-control js-contador" maxlength="2000" rows="2"></textarea>
           </div>
 
           <h6 class="text-muted mt-4">Consentimiento y responsable del reporte</h6>
@@ -171,11 +173,11 @@
           <div class="row">
             <div class="col-md-6 mb-3">
               <label for="id_diligencia_nombre" class="form-label">Nombre de quien diligencia</label>
-              <input type="text" id="id_diligencia_nombre" class="form-control">
+              <input type="text" id="id_diligencia_nombre" class="form-control" maxlength="200">
             </div>
             <div class="col-md-6 mb-3">
               <label for="id_diligencia_rol" class="form-label">Rol / cargo</label>
-              <input type="text" id="id_diligencia_rol" class="form-control" placeholder="Ej: ciudadano, gestor">
+              <input type="text" id="id_diligencia_rol" class="form-control" maxlength="150" placeholder="Ej: ciudadano, gestor">
             </div>
           </div>
 
@@ -236,6 +238,17 @@
   cargarObservatorios();
   cargarTiposHecho();
 
+  // Contador de caracteres bajo cada campo con límite (2000 en los textos largos).
+  document.querySelectorAll('textarea[maxlength], input[type=text][maxlength]').forEach(campo => {
+    const max = campo.getAttribute('maxlength');
+    const aviso = document.createElement('div');
+    aviso.className = 'form-text text-end';
+    campo.insertAdjacentElement('afterend', aviso);
+    const actualizar = () => { aviso.textContent = `${campo.value.length} / ${max} caracteres`; };
+    campo.addEventListener('input', actualizar);
+    actualizar();
+  });
+
   document.getElementById('formCaso').addEventListener('submit', async function (e) {
     e.preventDefault();
     const boton = document.getElementById('btnEnviar');
@@ -269,8 +282,19 @@
     formData.append('requiere_reserva', document.getElementById('id_reserva').checked);
     formData.append('diligencia_nombre', document.getElementById('id_diligencia_nombre').value);
     formData.append('diligencia_rol', document.getElementById('id_diligencia_rol').value);
-    const archivo = document.getElementById('id_archivo').files[0];
-    if (archivo) { formData.append('archivo_soporte', archivo); }
+    const archivos = Array.from(document.getElementById('id_archivo').files);
+    const permitidas = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'];
+    const problema = archivos.length > 5 ? 'Máximo 5 archivos.'
+      : archivos.some(a => !permitidas.includes(a.name.split('.').pop().toLowerCase())) ? 'Solo se aceptan fotos (JPG, PNG) y documentos (PDF, Word); no videos.'
+      : archivos.some(a => a.size > 10 * 1024 * 1024) ? 'Cada archivo puede pesar máximo 10 MB.'
+      : '';
+    if (problema) {
+      alerta.innerHTML = `<div class="alert alert-danger">${problema}</div>`;
+      boton.disabled = false;
+      boton.textContent = 'Enviar reporte';
+      return;
+    }
+    archivos.forEach(a => formData.append('archivos', a));
 
     const headers = {};
     const csrftoken = obtenerCookie('csrftoken');
